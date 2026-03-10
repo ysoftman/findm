@@ -12,6 +12,12 @@ type searchMsg struct {
 	err     error
 }
 
+// searchMoreMsg is sent when more search results are ready.
+type searchMoreMsg struct {
+	results []youtube.Video
+	err     error
+}
+
 // recommendMsg is sent when recommendation results are ready.
 type recommendMsg struct {
 	results []youtube.Video
@@ -28,8 +34,15 @@ func newSearchInput() textinput.Model {
 
 func performSearch(client *youtube.Client, query string) tea.Cmd {
 	return func() tea.Msg {
-		results, err := client.Search(query, 10)
+		results, err := client.Search(query, 10, 0)
 		return searchMsg{results: results, err: err}
+	}
+}
+
+func performSearchMore(client *youtube.Client, query string, offset int64) tea.Cmd {
+	return func() tea.Msg {
+		results, err := client.Search(query, 10, offset)
+		return searchMoreMsg{results: results, err: err}
 	}
 }
 

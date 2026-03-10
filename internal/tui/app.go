@@ -90,8 +90,9 @@ type Model struct {
 	animFrame   int
 
 	// Search results
-	results []youtube.Video
-	cursor  int
+	results     []youtube.Video
+	searchQuery string
+	cursor      int
 
 	// Playlist state
 	playlists       []string
@@ -158,6 +159,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cursor = 0
 		m.view = ResultsView
 		m.statusMsg = fmt.Sprintf("Found %d results", len(msg.results))
+		return m, nil
+
+	case searchMoreMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.errorMsg = msg.err.Error()
+			return m, nil
+		}
+		if len(msg.results) > 0 {
+			m.results = append(m.results, msg.results...)
+			m.statusMsg = fmt.Sprintf("Loaded %d more results (total: %d)", len(msg.results), len(m.results))
+		} else {
+			m.statusMsg = "No more results available"
+		}
 		return m, nil
 
 	case recommendMsg:
@@ -315,6 +330,7 @@ func (m Model) handleSearchView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.loading = true
 		m.statusMsg = "Searching..."
 		m.searchInput.Blur()
+		m.searchQuery = query
 		return m, performSearch(m.client, query)
 	case "esc":
 		if len(m.results) > 0 {
@@ -406,6 +422,13 @@ func (m Model) handleResultsView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.loading = true
 			m.statusMsg = "Finding recommendations..."
 			return m, performRecommend(m.client, v.ID)
+		}
+	case "L":
+		if m.searchQuery != "" {
+			m.loading = true
+			m.statusMsg = "Loading more results..."
+			offset := int64(len(m.results))
+			return m, performSearchMore(m.client, m.searchQuery, offset)
 		}
 	case "a":
 		if len(m.results) > 0 {
@@ -763,7 +786,7 @@ func (m Model) View() string {
 	case SearchView:
 		help = "Enter: search  Tab: playlists  Ctrl+C: quit"
 	case ResultsView:
-		help = "j/k: move  Enter: play  n/p: next/prev  Space: pause  s: stop  h/l: seek  +/-: vol  r: recommend  a: add  /: search  q: quit"
+		help = "j/k: move  Enter: play  n/p: next/prev  Space: pause  s: stop  h/l: seek  +/-: vol  r: recommend  a: add  L: more  /: search  q: quit"
 	case PlaylistListView:
 		help = "j/k: move  Enter: open  c: create  d: delete  Tab: search  Esc: back  q: quit"
 	case PlaylistDetailView:

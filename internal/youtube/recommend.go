@@ -32,7 +32,7 @@ func (c *Client) Recommend(videoID string, maxResults int64) ([]Video, error) {
 	query := buildRecommendQuery(meta.Title, meta.Channel)
 
 	// Search for similar videos, +1 to exclude the original
-	results, err := c.Search(query, maxResults+1)
+	results, err := c.Search(query, maxResults+1, 0)
 	if err != nil {
 		return nil, fmt.Errorf("recommend search failed: %w", err)
 	}

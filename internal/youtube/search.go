@@ -21,12 +21,17 @@ type ytdlpResult struct {
 }
 
 // Search performs a keyword search for music videos using yt-dlp.
-func (c *Client) Search(query string, maxResults int64) ([]Video, error) {
+// offset specifies how many results to skip (for pagination).
+func (c *Client) Search(query string, maxResults int64, offset int64) ([]Video, error) {
 	if maxResults <= 0 {
 		maxResults = 10
 	}
+	if offset < 0 {
+		offset = 0
+	}
 
-	searchQuery := fmt.Sprintf("ytsearch%d:%s", maxResults, query)
+	fetchCount := maxResults + int64(offset)
+	searchQuery := fmt.Sprintf("ytsearch%d:%s", fetchCount, query)
 	cmd := exec.Command("yt-dlp", "-j", "--flat-playlist", searchQuery)
 
 	stdout, err := cmd.StdoutPipe()
@@ -72,12 +77,19 @@ func (c *Client) Search(query string, maxResults int64) ([]Video, error) {
 	if err := cmd.Wait(); err != nil {
 		// If we got some results, return them despite exit error
 		if len(videos) > 0 {
-			return videos, nil
+			return applyOffset(videos, offset), nil
 		}
 		return nil, fmt.Errorf("yt-dlp search failed: %w", err)
 	}
 
-	return videos, nil
+	return applyOffset(videos, offset), nil
+}
+
+func applyOffset(videos []Video, offset int64) []Video {
+	if offset <= 0 || int(offset) >= len(videos) {
+		return videos
+	}
+	return videos[offset:]
 }
 
 // formatDuration converts seconds (float64) to "M:SS" or "H:MM:SS" format.
