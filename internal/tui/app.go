@@ -138,6 +138,12 @@ func NewModel(client *youtube.Client) Model {
 	}
 }
 
+// Cleanup releases resources (stops mpv process and visualizer).
+func (m Model) Cleanup() {
+	m.player.Stop()
+	m.viz.Stop()
+}
+
 func (m Model) Init() tea.Cmd {
 	return textinput.Blink
 }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
+	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/ysoftman/findm/internal/player"
@@ -35,6 +37,17 @@ func main() {
 
 	// Start TUI
 	model := tui.NewModel(client)
+	defer model.Cleanup()
+
+	// Handle OS signals to ensure mpv process cleanup
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGHUP)
+	go func() {
+		<-sigCh
+		model.Cleanup()
+		os.Exit(0)
+	}()
+
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
