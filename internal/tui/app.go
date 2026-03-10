@@ -40,6 +40,23 @@ func (m *Model) handlePlayerErr(err error) {
 	}
 }
 
+// playTrackAt plays a track from the current playlist at the given index.
+func (m *Model) playTrackAt(idx int) tea.Cmd {
+	if m.currentPlaylist == nil || idx < 0 || idx >= len(m.currentPlaylist.Tracks) {
+		return nil
+	}
+	t := m.currentPlaylist.Tracks[idx]
+	if err := m.player.Play(t.URL, t.Title); err != nil {
+		m.errorMsg = err.Error()
+		return nil
+	}
+	m.playingTrackIdx = idx
+	m.trackCursor = idx
+	m.autoPlay = true
+	m.statusMsg = ""
+	return tickCmd()
+}
+
 // View represents the current active view.
 type View int
 
@@ -81,6 +98,8 @@ type Model struct {
 	playlistCursor  int
 	currentPlaylist *playlist.Playlist
 	trackCursor     int
+	playingTrackIdx int  // index of currently playing track in playlist (-1 = none)
+	autoPlay        bool // auto-play next track when current finishes
 
 	// Status
 	statusMsg string
@@ -110,6 +129,7 @@ func NewModel(client *youtube.Client) Model {
 		client:           client,
 		player:           player.New(),
 		viz:              visualizer.New(),
+		playingTrackIdx:  -1,
 		tab:              SearchTab,
 		view:             SearchView,
 		searchInput:      si,
@@ -172,6 +192,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, vizTickCmd()
 			}
 			return m, tickCmd()
+		}
+		// Track ended: auto-play next in playlist
+		if m.autoPlay && m.currentPlaylist != nil {
+			next := m.playingTrackIdx + 1
+			if next < len(m.currentPlaylist.Tracks) {
+				cmd := m.playTrackAt(next)
+				if cmd != nil {
+					return m, cmd
+				}
+			} else {
+				m.autoPlay = false
+				m.playingTrackIdx = -1
+				m.statusMsg = "Playlist finished"
+			}
 		}
 		m.viz.Stop()
 		return m, nil
@@ -311,6 +345,34 @@ func (m Model) handleResultsView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if err := m.player.Play(v.URL, v.Title); err != nil {
 				m.errorMsg = err.Error()
 			} else {
+				m.autoPlay = false
+				m.playingTrackIdx = -1
+				m.statusMsg = ""
+				return m, tickCmd()
+			}
+		}
+	case "n":
+		if m.cursor < len(m.results)-1 {
+			m.cursor++
+			v := m.results[m.cursor]
+			if err := m.player.Play(v.URL, v.Title); err != nil {
+				m.errorMsg = err.Error()
+			} else {
+				m.autoPlay = false
+				m.playingTrackIdx = -1
+				m.statusMsg = ""
+				return m, tickCmd()
+			}
+		}
+	case "p":
+		if m.cursor > 0 {
+			m.cursor--
+			v := m.results[m.cursor]
+			if err := m.player.Play(v.URL, v.Title); err != nil {
+				m.errorMsg = err.Error()
+			} else {
+				m.autoPlay = false
+				m.playingTrackIdx = -1
 				m.statusMsg = ""
 				return m, tickCmd()
 			}
@@ -325,6 +387,8 @@ func (m Model) handleResultsView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "s":
 		m.player.Stop()
 		m.viz.Stop()
+		m.autoPlay = false
+		m.playingTrackIdx = -1
 		m.statusMsg = "Playback stopped"
 	case "left", "h":
 		m.handlePlayerErr(m.player.Seek(-10))
@@ -417,12 +481,26 @@ func (m Model) handlePlaylistDetailView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "enter":
 		if m.currentPlaylist != nil && len(m.currentPlaylist.Tracks) > 0 {
-			t := m.currentPlaylist.Tracks[m.trackCursor]
-			if err := m.player.Play(t.URL, t.Title); err != nil {
-				m.errorMsg = err.Error()
-			} else {
-				m.statusMsg = ""
-				return m, tickCmd()
+			cmd := m.playTrackAt(m.trackCursor)
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	case "n":
+		if m.currentPlaylist != nil && m.playingTrackIdx >= 0 {
+			next := m.playingTrackIdx + 1
+			if next < len(m.currentPlaylist.Tracks) {
+				cmd := m.playTrackAt(next)
+				if cmd != nil {
+					return m, cmd
+				}
+			}
+		}
+	case "p":
+		if m.currentPlaylist != nil && m.playingTrackIdx > 0 {
+			cmd := m.playTrackAt(m.playingTrackIdx - 1)
+			if cmd != nil {
+				return m, cmd
 			}
 		}
 	case " ":
@@ -435,6 +513,8 @@ func (m Model) handlePlaylistDetailView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "s":
 		m.player.Stop()
 		m.viz.Stop()
+		m.autoPlay = false
+		m.playingTrackIdx = -1
 		m.statusMsg = "Playback stopped"
 	case "left":
 		m.handlePlayerErr(m.player.Seek(-10))
@@ -683,11 +763,11 @@ func (m Model) View() string {
 	case SearchView:
 		help = "Enter: search  Tab: playlists  Ctrl+C: quit"
 	case ResultsView:
-		help = "j/k: move  Enter: play  Space: pause  s: stop  h/l: seek  +/-: vol  r: recommend  a: add  /: search  q: quit"
+		help = "j/k: move  Enter: play  n/p: next/prev  Space: pause  s: stop  h/l: seek  +/-: vol  r: recommend  a: add  /: search  q: quit"
 	case PlaylistListView:
 		help = "j/k: move  Enter: open  c: create  d: delete  Tab: search  Esc: back  q: quit"
 	case PlaylistDetailView:
-		help = "j/k: move  Enter: play  Space: pause  s: stop  ←→: seek  +/-: vol  d: remove  Esc: back  q: quit"
+		help = "j/k: move  Enter: play  n/p: next/prev  Space: pause  s: stop  ←→: seek  +/-: vol  d: remove  Esc: back  q: quit"
 	}
 	sb.WriteString(helpStyle.Render(help) + "\n")
 
