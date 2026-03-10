@@ -138,14 +138,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Clear error on any key
 		m.errorMsg = ""
 
+		// Handle adding to playlist (check before creatingPlaylist
+		// because addToPlaylist has its own creatingPlaylist sub-state)
+		if m.addingToPlaylist {
+			return m.handleAddToPlaylist(msg)
+		}
+
 		// Handle playlist creation input
 		if m.creatingPlaylist {
 			return m.handlePlaylistCreation(msg)
-		}
-
-		// Handle adding to playlist
-		if m.addingToPlaylist {
-			return m.handleAddToPlaylist(msg)
 		}
 
 		switch msg.String() {
@@ -566,10 +567,10 @@ func (m Model) View() string {
 		}
 	}
 
-	// Status/Error
+	// Status/Error (skip statusMsg when loading to avoid duplicate)
 	if m.errorMsg != "" {
 		sb.WriteString("\n" + errorStyle.Render("Error: "+m.errorMsg) + "\n")
-	} else if m.statusMsg != "" {
+	} else if m.statusMsg != "" && (!m.loading || m.view != SearchView) {
 		sb.WriteString("\n" + statusStyle.Render(m.statusMsg) + "\n")
 	}
 
