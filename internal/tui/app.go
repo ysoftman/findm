@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -10,6 +12,26 @@ import (
 	"github.com/ysoftman/findm/internal/playlist"
 	"github.com/ysoftman/findm/internal/youtube"
 )
+
+type tickMsg time.Time
+
+func tickCmd() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
+}
+
+// handlePlayerErr handles player errors, showing ErrNotReady as status instead of error.
+func (m *Model) handlePlayerErr(err error) {
+	if err == nil {
+		return
+	}
+	if errors.Is(err, player.ErrNotReady) {
+		m.statusMsg = "Preparing playback..."
+	} else {
+		m.errorMsg = err.Error()
+	}
+}
 
 // View represents the current active view.
 type View int
@@ -118,6 +140,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cursor = 0
 		m.view = ResultsView
 		m.statusMsg = fmt.Sprintf("Found %d recommendations", len(msg.results))
+		return m, nil
+
+	case tickMsg:
+		state := m.player.GetState()
+		if state != player.Stopped {
+			if state == player.Preparing {
+				m.statusMsg = "Preparing playback..."
+			} else {
+				if m.statusMsg == "Preparing playback..." {
+					m.statusMsg = ""
+				}
+			}
+			return m, tickCmd()
+		}
 		return m, nil
 
 	case playlistsLoadedMsg:
@@ -254,12 +290,25 @@ func (m Model) handleResultsView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if err := m.player.Play(v.URL, v.Title); err != nil {
 				m.errorMsg = err.Error()
 			} else {
-				m.statusMsg = fmt.Sprintf("Playing: %s", v.Title)
+				m.statusMsg = ""
+				return m, tickCmd()
 			}
 		}
 	case " ":
+		m.handlePlayerErr(m.player.TogglePause())
+	case "s":
 		m.player.Stop()
 		m.statusMsg = "Playback stopped"
+	case "left", "h":
+		m.handlePlayerErr(m.player.Seek(-10))
+	case "right", "l":
+		m.handlePlayerErr(m.player.Seek(10))
+	case "+", "=":
+		vol := m.player.GetVolume() + 10
+		m.handlePlayerErr(m.player.SetVolume(vol))
+	case "-":
+		vol := m.player.GetVolume() - 10
+		m.handlePlayerErr(m.player.SetVolume(vol))
 	case "r":
 		if len(m.results) > 0 {
 			v := m.results[m.cursor]
@@ -345,12 +394,25 @@ func (m Model) handlePlaylistDetailView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if err := m.player.Play(t.URL, t.Title); err != nil {
 				m.errorMsg = err.Error()
 			} else {
-				m.statusMsg = fmt.Sprintf("Playing: %s", t.Title)
+				m.statusMsg = ""
+				return m, tickCmd()
 			}
 		}
 	case " ":
+		m.handlePlayerErr(m.player.TogglePause())
+	case "s":
 		m.player.Stop()
 		m.statusMsg = "Playback stopped"
+	case "left":
+		m.handlePlayerErr(m.player.Seek(-10))
+	case "right":
+		m.handlePlayerErr(m.player.Seek(10))
+	case "+", "=":
+		vol := m.player.GetVolume() + 10
+		m.handlePlayerErr(m.player.SetVolume(vol))
+	case "-":
+		vol := m.player.GetVolume() - 10
+		m.handlePlayerErr(m.player.SetVolume(vol))
 	case "d":
 		if m.currentPlaylist != nil && len(m.currentPlaylist.Tracks) > 0 {
 			if err := playlist.RemoveTrack(m.currentPlaylist.Name, m.trackCursor); err != nil {
@@ -583,11 +645,11 @@ func (m Model) View() string {
 	case SearchView:
 		help = "Enter: search  Tab: playlists  Ctrl+C: quit"
 	case ResultsView:
-		help = "j/k: move  Enter: play  Space: stop  r: recommend  a: add to playlist  /: search  Tab: playlists  q: quit"
+		help = "j/k: move  Enter: play  Space: pause  s: stop  h/l: seek  +/-: vol  r: recommend  a: add  /: search  q: quit"
 	case PlaylistListView:
 		help = "j/k: move  Enter: open  c: create  d: delete  Tab: search  Esc: back  q: quit"
 	case PlaylistDetailView:
-		help = "j/k: move  Enter: play  Space: stop  d: remove track  Esc: back  q: quit"
+		help = "j/k: move  Enter: play  Space: pause  s: stop  ←→: seek  +/-: vol  d: remove  Esc: back  q: quit"
 	}
 	sb.WriteString(helpStyle.Render(help) + "\n")
 

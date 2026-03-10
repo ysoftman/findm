@@ -70,4 +70,11 @@ var (
 	scrollIndicatorStyle = lipgloss.NewStyle().
 				Foreground(mutedColor).
 				Italic(true)
+
+	// Progress bar styles
+	progressFilledStyle = lipgloss.NewStyle().
+				Foreground(successColor)
+
+	progressEmptyStyle = lipgloss.NewStyle().
+				Foreground(mutedColor)
 )
