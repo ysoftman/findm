@@ -5,9 +5,26 @@ import (
 	"strings"
 
 	"github.com/ysoftman/findm/internal/player"
+	"github.com/ysoftman/findm/internal/visualizer"
 )
 
-func renderPlayerBar(p *player.Player, width int) string {
+var playingIcons = []string{"♪ Playing", "♫ Playing", "♬ Playing", "♫ Playing"}
+var preparingIcons = []string{"⏳ Preparing.", "⏳ Preparing..", "⏳ Preparing..."}
+
+func animatedStateString(state player.State, frame int) string {
+	switch state {
+	case player.Preparing:
+		return preparingIcons[frame%len(preparingIcons)]
+	case player.Playing:
+		return playingIcons[frame%len(playingIcons)]
+	case player.Paused:
+		return "⏸ Paused"
+	default:
+		return "⏹ Stopped"
+	}
+}
+
+func renderPlayerBar(p *player.Player, width, frame int) string {
 	if width <= 0 {
 		width = 80
 	}
@@ -23,9 +40,7 @@ func renderPlayerBar(p *player.Player, width int) string {
 	vol := p.GetVolume()
 
 	// Truncate title based on available width
-	// Layout: "  ▶ Title  [progress] pos/dur  Vol:XX%"
-	// Reserve ~45 chars for controls/progress minimum
-	maxTitle := width - 45
+	maxTitle := width - 50
 	if maxTitle < 15 {
 		maxTitle = 15
 	}
@@ -33,26 +48,76 @@ func renderPlayerBar(p *player.Player, width int) string {
 		title = title[:maxTitle-3] + "..."
 	}
 
-	status := p.StateString()
-
-	// Build progress bar
+	status := animatedStateString(p.GetState(), frame)
 	progressBar := renderProgressBar(pos, dur, width)
-
 	posStr := formatSeconds(pos)
 	durStr := formatSeconds(dur)
 
-	var line string
-	if p.GetState() == player.Paused {
-		line = fmt.Sprintf("  %s  %s  %s %s/%s  Vol:%d%%", status, title, progressBar, posStr, durStr, vol)
-	} else {
-		line = fmt.Sprintf("  %s  %s  %s %s/%s  Vol:%d%%", status, title, progressBar, posStr, durStr, vol)
-	}
-
+	line := fmt.Sprintf("  %s  %s  %s %s/%s  Vol:%d%%", status, title, progressBar, posStr, durStr, vol)
 	return style.Render(line)
 }
 
+func renderVisualizer(viz *visualizer.Visualizer, width int) string {
+	if viz == nil || !viz.IsRunning() {
+		return ""
+	}
+
+	values := viz.Values()
+	peaks := viz.Peaks()
+	if len(values) == 0 {
+		return ""
+	}
+
+	blocks := []rune{' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
+
+	var sb strings.Builder
+	sb.WriteString("  ")
+	for i, v := range values {
+		idx := int(v * float64(len(blocks)-1))
+		if idx < 0 {
+			idx = 0
+		}
+		if idx >= len(blocks) {
+			idx = len(blocks) - 1
+		}
+
+		ch := string(blocks[idx])
+
+		// Show peak marker if peak is significantly above current value
+		isPeak := false
+		if i < len(peaks) && peaks[i]-v > 0.15 && peaks[i] > 0.3 {
+			peakIdx := int(peaks[i] * float64(len(blocks)-1))
+			if peakIdx >= len(blocks) {
+				peakIdx = len(blocks) - 1
+			}
+			if peakIdx > idx {
+				ch = string(blocks[peakIdx])
+				isPeak = true
+			}
+		}
+
+		// Color from gradient based on value (0.0-1.0 → 8 color levels)
+		var rendered string
+		if isPeak {
+			rendered = vizPeakStyle.Render(ch)
+		} else {
+			ci := int(v * float64(len(vizGradient)-1))
+			if ci < 0 {
+				ci = 0
+			}
+			if ci >= len(vizGradient) {
+				ci = len(vizGradient) - 1
+			}
+			rendered = vizGradient[ci].Render(ch)
+		}
+
+		sb.WriteString(rendered)
+	}
+
+	return sb.String()
+}
+
 func renderProgressBar(pos, dur float64, width int) string {
-	// Progress bar width: scale with terminal width
 	barWidth := width / 5
 	if barWidth < 8 {
 		barWidth = 8

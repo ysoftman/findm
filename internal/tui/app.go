@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/ysoftman/findm/internal/player"
 	"github.com/ysoftman/findm/internal/playlist"
+	"github.com/ysoftman/findm/internal/visualizer"
 	"github.com/ysoftman/findm/internal/youtube"
 )
 
@@ -17,6 +18,12 @@ type tickMsg time.Time
 
 func tickCmd() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
+}
+
+func vizTickCmd() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }
@@ -55,6 +62,7 @@ const (
 type Model struct {
 	client *youtube.Client
 	player *player.Player
+	viz    *visualizer.Visualizer
 
 	// UI state
 	tab         Tab
@@ -62,6 +70,7 @@ type Model struct {
 	searchInput textinput.Model
 	width       int
 	height      int
+	animFrame   int
 
 	// Search results
 	results []youtube.Video
@@ -100,6 +109,7 @@ func NewModel(client *youtube.Client) Model {
 	return Model{
 		client:           client,
 		player:           player.New(),
+		viz:              visualizer.New(),
 		tab:              SearchTab,
 		view:             SearchView,
 		searchInput:      si,
@@ -143,17 +153,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tickMsg:
+		m.animFrame++
 		state := m.player.GetState()
 		if state != player.Stopped {
-			if state == player.Preparing {
+			switch state {
+			case player.Preparing:
 				m.statusMsg = "Preparing playback..."
-			} else {
+				m.viz.Stop()
+			case player.Playing:
 				if m.statusMsg == "Preparing playback..." {
 					m.statusMsg = ""
 				}
+				if !m.viz.IsRunning() {
+					m.viz.Start()
+				}
+			}
+			if m.viz.IsRunning() {
+				return m, vizTickCmd()
 			}
 			return m, tickCmd()
 		}
+		m.viz.Stop()
 		return m, nil
 
 	case playlistsLoadedMsg:
@@ -193,6 +213,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			m.player.Stop()
+			m.viz.Stop()
 			return m, tea.Quit
 
 		case "tab":
@@ -296,8 +317,14 @@ func (m Model) handleResultsView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case " ":
 		m.handlePlayerErr(m.player.TogglePause())
+		if m.player.GetState() == player.Paused {
+			m.viz.Stop()
+		} else if m.player.GetState() == player.Playing {
+			m.viz.Start()
+		}
 	case "s":
 		m.player.Stop()
+		m.viz.Stop()
 		m.statusMsg = "Playback stopped"
 	case "left", "h":
 		m.handlePlayerErr(m.player.Seek(-10))
@@ -400,8 +427,14 @@ func (m Model) handlePlaylistDetailView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case " ":
 		m.handlePlayerErr(m.player.TogglePause())
+		if m.player.GetState() == player.Paused {
+			m.viz.Stop()
+		} else if m.player.GetState() == player.Playing {
+			m.viz.Start()
+		}
 	case "s":
 		m.player.Stop()
+		m.viz.Stop()
 		m.statusMsg = "Playback stopped"
 	case "left":
 		m.handlePlayerErr(m.player.Seek(-10))
@@ -575,7 +608,7 @@ func (m Model) View() string {
 			sb.WriteString(titleStyle.Render("New playlist (track will be added automatically):") + "\n\n")
 			sb.WriteString("Name: " + m.newPlaylistInput.View() + "\n")
 			sb.WriteString(helpStyle.Render("Enter: create & add  Esc: back") + "\n")
-			sb.WriteString("\n" + renderPlayerBar(m.player, m.width) + "\n")
+			sb.WriteString("\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n")
 			return sb.String()
 		}
 		sb.WriteString(titleStyle.Render("Add to playlist:") + "\n\n")
@@ -593,7 +626,7 @@ func (m Model) View() string {
 			}
 		}
 		sb.WriteString(helpStyle.Render("\nj/k: move  Enter: select  c: create new  Esc: cancel") + "\n")
-		sb.WriteString("\n" + renderPlayerBar(m.player, m.width) + "\n")
+		sb.WriteString("\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n")
 		return sb.String()
 	}
 
@@ -601,7 +634,7 @@ func (m Model) View() string {
 	if m.creatingPlaylist {
 		sb.WriteString("New playlist name: " + m.newPlaylistInput.View() + "\n")
 		sb.WriteString(helpStyle.Render("Enter: create  Esc: cancel") + "\n")
-		sb.WriteString("\n" + renderPlayerBar(m.player, m.width) + "\n")
+		sb.WriteString("\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n")
 		return sb.String()
 	}
 
@@ -636,8 +669,13 @@ func (m Model) View() string {
 		sb.WriteString("\n" + statusStyle.Render(m.statusMsg) + "\n")
 	}
 
+	// Visualizer
+	if vizLine := renderVisualizer(m.viz, m.width); vizLine != "" {
+		sb.WriteString(vizLine + "\n")
+	}
+
 	// Player bar
-	sb.WriteString("\n" + renderPlayerBar(m.player, m.width) + "\n")
+	sb.WriteString("\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n")
 
 	// Help
 	var help string
