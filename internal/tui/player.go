@@ -12,11 +12,13 @@ var playingIcons = []string{"♪ Playing", "♫ Playing", "♬ Playing", "♫ Pl
 var preparingIcons = []string{"⏳ Preparing.", "⏳ Preparing..", "⏳ Preparing..."}
 
 func animatedStateString(state player.State, frame int) string {
+	// Slow down icon animation (~1s per step at 100ms tick)
+	slow := frame / 10
 	switch state {
 	case player.Preparing:
-		return preparingIcons[frame%len(preparingIcons)]
+		return preparingIcons[slow%len(preparingIcons)]
 	case player.Playing:
-		return playingIcons[frame%len(playingIcons)]
+		return playingIcons[slow%len(playingIcons)]
 	case player.Paused:
 		return "⏸ Paused"
 	default:

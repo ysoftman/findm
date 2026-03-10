@@ -749,13 +749,13 @@ func (m Model) View() string {
 		sb.WriteString("\n" + statusStyle.Render(m.statusMsg) + "\n")
 	}
 
+	// Player bar
+	sb.WriteString("\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n")
+
 	// Visualizer
 	if vizLine := renderVisualizer(m.viz, m.width); vizLine != "" {
 		sb.WriteString(vizLine + "\n")
 	}
-
-	// Player bar
-	sb.WriteString("\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n")
 
 	// Help
 	var help string
