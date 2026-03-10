@@ -13,8 +13,7 @@ var (
 	// Title style
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(primaryColor).
-			MarginBottom(1)
+			Foreground(primaryColor)
 
 	// Tab styles
 	activeTabStyle = lipgloss.NewStyle().

@@ -700,10 +700,7 @@ func (m Model) loadPlaylists() tea.Cmd {
 func (m Model) View() string {
 	var sb strings.Builder
 
-	// Title
-	sb.WriteString(titleStyle.Render(fmt.Sprintf("♪ findm - Music Finder (%s)", m.version)) + "\n\n")
-
-	// Tabs
+	// Title and Tabs (same line)
 	searchTab := inactiveTabStyle.Render("Search")
 	playlistTab := inactiveTabStyle.Render("Playlists")
 	if m.tab == SearchTab {
@@ -711,7 +708,8 @@ func (m Model) View() string {
 	} else {
 		playlistTab = activeTabStyle.Render("Playlists")
 	}
-	sb.WriteString(searchTab + " " + playlistTab + "\n\n")
+	title := titleStyle.Render(fmt.Sprintf("♪ findm - Music Finder (%s)", m.version))
+	sb.WriteString(title + "  " + searchTab + " " + playlistTab + "\n\n")
 
 	// Adding to playlist overlay
 	if m.addingToPlaylist {
