@@ -36,7 +36,7 @@ func main() {
 	}
 
 	// Start TUI
-	model := tui.NewModel(client)
+	model := tui.NewModel(client, Version)
 	defer model.Cleanup()
 
 	// Handle OS signals to ensure mpv process cleanup

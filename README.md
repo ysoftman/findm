@@ -60,6 +60,16 @@ cd findm
 go build -o findm .
 ```
 
+버전을 지정하여 빌드:
+
+```bash
+go build -ldflags "-X main.Version=1.0.0" -o findm .
+```
+
+버전을 지정하지 않으면 타이틀에 `dev`로 표시됩니다.
+GitHub에서 태그를 push하면 GitHub Actions가
+해당 태그명으로 자동 빌드하여 Release에 바이너리를 첨부합니다.
+
 ## 실행
 
 ```bash
@@ -113,6 +123,7 @@ go build -o findm .
 ```text
 findm/
 ├── main.go                  # 엔트리포인트
+├── version.go               # 버전 정보 (ldflags로 주입)
 ├── internal/
 │   ├── config/config.go     # 설정 관리
 │   ├── youtube/

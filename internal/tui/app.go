@@ -77,9 +77,10 @@ const (
 
 // Model is the main bubbletea model.
 type Model struct {
-	client *youtube.Client
-	player *player.Player
-	viz    *visualizer.Visualizer
+	client  *youtube.Client
+	player  *player.Player
+	viz     *visualizer.Visualizer
+	version string
 
 	// UI state
 	tab         Tab
@@ -117,7 +118,7 @@ type Model struct {
 }
 
 // NewModel creates a new TUI model.
-func NewModel(client *youtube.Client) Model {
+func NewModel(client *youtube.Client, version string) Model {
 	si := newSearchInput()
 	si.Focus()
 
@@ -130,6 +131,7 @@ func NewModel(client *youtube.Client) Model {
 		client:           client,
 		player:           player.New(),
 		viz:              visualizer.New(),
+		version:          version,
 		playingTrackIdx:  -1,
 		tab:              SearchTab,
 		view:             SearchView,
@@ -699,7 +701,7 @@ func (m Model) View() string {
 	var sb strings.Builder
 
 	// Title
-	sb.WriteString(titleStyle.Render("♪ findm - Music Finder") + "\n\n")
+	sb.WriteString(titleStyle.Render(fmt.Sprintf("♪ findm - Music Finder (%s)", m.version)) + "\n\n")
 
 	// Tabs
 	searchTab := inactiveTabStyle.Render("Search")
