@@ -197,7 +197,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Update text input
+	// Update text inputs for non-key messages (e.g. Blink)
+	if m.creatingPlaylist {
+		var cmd tea.Cmd
+		m.newPlaylistInput, cmd = m.newPlaylistInput.Update(msg)
+		return m, cmd
+	}
+
 	if m.view == SearchView && m.searchInput.Focused() {
 		var cmd tea.Cmd
 		m.searchInput, cmd = m.searchInput.Update(msg)
@@ -394,6 +400,47 @@ func (m Model) handlePlaylistCreation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleAddToPlaylist(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// If creating a new playlist within add overlay
+	if m.creatingPlaylist {
+		switch msg.String() {
+		case "enter":
+			name := strings.TrimSpace(m.newPlaylistInput.Value())
+			if name != "" {
+				if err := playlist.Create(name); err != nil {
+					m.errorMsg = err.Error()
+				} else {
+					// Created and auto-add the track
+					if len(m.results) > 0 {
+						v := m.results[m.cursor]
+						track := playlist.Track{
+							VideoID: v.ID,
+							Title:   v.Title,
+							Channel: v.Channel,
+							URL:     v.URL,
+						}
+						if err := playlist.AddTrack(name, track); err != nil {
+							m.errorMsg = err.Error()
+						} else {
+							m.statusMsg = fmt.Sprintf("Created %s and added: %s", name, v.Title)
+						}
+					}
+				}
+			}
+			m.creatingPlaylist = false
+			m.addingToPlaylist = false
+			m.newPlaylistInput.Blur()
+			return m, m.loadPlaylists()
+		case "esc":
+			m.creatingPlaylist = false
+			m.newPlaylistInput.Blur()
+			return m, nil
+		default:
+			var cmd tea.Cmd
+			m.newPlaylistInput, cmd = m.newPlaylistInput.Update(msg)
+			return m, cmd
+		}
+	}
+
 	switch msg.String() {
 	case "j", "down":
 		if m.addPlaylistCursor < len(m.playlists)-1 {
@@ -420,6 +467,11 @@ func (m Model) handleAddToPlaylist(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.addingToPlaylist = false
+	case "c":
+		m.creatingPlaylist = true
+		m.newPlaylistInput.SetValue("")
+		m.newPlaylistInput.Focus()
+		return m, nil
 	case "esc":
 		m.addingToPlaylist = false
 	}
@@ -456,9 +508,16 @@ func (m Model) View() string {
 
 	// Adding to playlist overlay
 	if m.addingToPlaylist {
+		if m.creatingPlaylist {
+			sb.WriteString(titleStyle.Render("New playlist (track will be added automatically):") + "\n\n")
+			sb.WriteString("Name: " + m.newPlaylistInput.View() + "\n")
+			sb.WriteString(helpStyle.Render("Enter: create & add  Esc: back") + "\n")
+			sb.WriteString("\n" + renderPlayerBar(m.player, m.width) + "\n")
+			return sb.String()
+		}
 		sb.WriteString(titleStyle.Render("Add to playlist:") + "\n\n")
 		if len(m.playlists) == 0 {
-			sb.WriteString(normalItemStyle.Render("No playlists. Create one first (Tab → c).") + "\n")
+			sb.WriteString(normalItemStyle.Render("No playlists yet. Press 'c' to create one.") + "\n")
 		} else {
 			for i, name := range m.playlists {
 				prefix := "  "
@@ -470,7 +529,7 @@ func (m Model) View() string {
 				sb.WriteString(style.Render(fmt.Sprintf("%s%s", prefix, name)) + "\n")
 			}
 		}
-		sb.WriteString(helpStyle.Render("\nj/k: move  Enter: select  Esc: cancel") + "\n")
+		sb.WriteString(helpStyle.Render("\nj/k: move  Enter: select  c: create new  Esc: cancel") + "\n")
 		sb.WriteString("\n" + renderPlayerBar(m.player, m.width) + "\n")
 		return sb.String()
 	}
