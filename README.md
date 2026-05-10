@@ -12,6 +12,8 @@ TUI 인터페이스를 제공합니다.
 - [Go](https://go.dev/) 1.21+
 - [mpv](https://mpv.io/) - 오디오 재생 엔진
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) - YouTube 검색 및 메타데이터 추출
+- [deno](https://deno.com/) - yt-dlp의 JavaScript 런타임
+  (YouTube Shorts·최신 영상 추출에 필요)
 
 ### mpv 설치
 
@@ -35,6 +37,28 @@ brew install yt-dlp
 # pip (모든 플랫폼)
 pip install yt-dlp
 ```
+
+### deno 설치 (필수)
+
+YouTube가 최근 영상 정보 추출 시 JavaScript 실행을 요구하는 흐름을
+늘렸기 때문에, JS 런타임이 없으면 일부 영상(특히 Shorts와 최신
+업로드)이 `This video is not available`로 떨어질 수 있습니다.
+yt-dlp는 기본으로 `deno`를 인식하므로 설치만 해두면 됩니다.
+
+```bash
+# macOS
+brew install deno
+
+# 다른 플랫폼은 https://deno.com/ 참고
+```
+
+다른 JS 런타임을 쓰고 싶다면 yt-dlp에 명시할 수 있습니다.
+
+```bash
+yt-dlp --js-runtimes node ...
+```
+
+참고: <https://github.com/yt-dlp/yt-dlp/wiki/EJS>
 
 ## 설치
 
