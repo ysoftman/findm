@@ -5,6 +5,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/mattn/go-runewidth"
 	"github.com/ysoftman/findm/internal/player"
 	"github.com/ysoftman/findm/internal/visualizer"
 )
@@ -58,14 +59,12 @@ func renderPlayerBar(p *player.Player, width, frame int) string {
 	dur := p.GetDuration()
 	vol := p.GetVolume()
 
-	// Truncate title based on available width
+	// Truncate title based on available display columns (wide-char aware).
 	maxTitle := width - 50
 	if maxTitle < 15 {
 		maxTitle = 15
 	}
-	if len(title) > maxTitle {
-		title = title[:maxTitle-3] + "..."
-	}
+	title = runewidth.Truncate(title, maxTitle, "...")
 
 	status := animatedStateString(p.GetState(), frame)
 	progressBar := renderProgressBar(pos, dur, width)

@@ -66,8 +66,8 @@ func (c *Client) Search(query string, maxResults int64, offset int64) ([]Video, 
 
 		videos = append(videos, Video{
 			ID:        result.ID,
-			Title:     result.Title,
-			Channel:   result.Channel,
+			Title:     normalizeText(result.Title),
+			Channel:   normalizeText(result.Channel),
 			Duration:  formatDuration(result.Duration),
 			ViewCount: result.ViewCount,
 			URL:       url,
@@ -123,6 +123,8 @@ func (c *Client) fetchVideoMetadata(videoID string) (*ytdlpResult, error) {
 	if err := json.Unmarshal([]byte(strings.TrimSpace(string(output))), &result); err != nil {
 		return nil, fmt.Errorf("failed to parse video metadata: %w", err)
 	}
+	result.Title = normalizeText(result.Title)
+	result.Channel = normalizeText(result.Channel)
 
 	return &result, nil
 }

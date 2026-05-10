@@ -3,6 +3,8 @@ package youtube
 import (
 	"fmt"
 	"os/exec"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // Video represents a YouTube video with relevant metadata.
@@ -13,6 +15,13 @@ type Video struct {
 	Duration  string
 	ViewCount uint64
 	URL       string
+}
+
+// normalizeText returns the NFC-normalized form of s.
+// yt-dlp sometimes returns Korean (and other CJK) text in NFD,
+// which renders as separated jamo in many terminal fonts.
+func normalizeText(s string) string {
+	return norm.NFC.String(s)
 }
 
 // Client wraps yt-dlp for YouTube search and metadata retrieval.
