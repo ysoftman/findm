@@ -322,13 +322,13 @@ func resampledFrameValue(frame []float64, idx, total int) float64 {
 }
 
 func (v *Visualizer) animate(stopCh chan struct{}) {
-	ticker := time.NewTicker(25 * time.Millisecond)
+	ticker := time.NewTicker(40 * time.Millisecond)
 	defer ticker.Stop()
 
-	beatTick := time.NewTicker(170 * time.Millisecond)
+	beatTick := time.NewTicker(260 * time.Millisecond)
 	defer beatTick.Stop()
 
-	accentTick := time.NewTicker(800 * time.Millisecond)
+	accentTick := time.NewTicker(1200 * time.Millisecond)
 	defer accentTick.Stop()
 
 	frame := 0
