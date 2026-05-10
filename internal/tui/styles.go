@@ -45,6 +45,10 @@ var (
 	viewCountStyle = lipgloss.NewStyle().
 			Foreground(mutedColor)
 
+	urlStyle = lipgloss.NewStyle().
+			Foreground(mutedColor).
+			Underline(true)
+
 	// Player bar style
 	playerBarStyle = lipgloss.NewStyle().
 			Foreground(successColor).

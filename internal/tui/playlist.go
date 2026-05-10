@@ -49,6 +49,16 @@ func renderPlaylistList(names []string, cursor int, height int) string {
 	return sb.String()
 }
 
+func trackURL(t playlist.Track) string {
+	if t.URL != "" {
+		return t.URL
+	}
+	if t.VideoID != "" {
+		return fmt.Sprintf("https://www.youtube.com/watch?v=%s", t.VideoID)
+	}
+	return ""
+}
+
 func renderPlaylistDetail(pl *playlist.Playlist, cursor int, height int) string {
 	var sb strings.Builder
 	sb.WriteString(titleStyle.Render(fmt.Sprintf("Playlist: %s", pl.Name)) + "\n\n")
@@ -59,7 +69,7 @@ func renderPlaylistDetail(pl *playlist.Playlist, cursor int, height int) string 
 	}
 
 	visibleCount := fittedVisibleCount(len(pl.Tracks), cursor, height, func(start, end int) int {
-		lines := 2 + (end-start)*2
+		lines := 2 + (end-start)*3
 		if start > 0 {
 			lines++
 		}
@@ -84,8 +94,10 @@ func renderPlaylistDetail(pl *playlist.Playlist, cursor int, height int) string 
 		}
 		title := style.Render(fmt.Sprintf("%s%s", prefix, t.Title))
 		info := fmt.Sprintf("    %s", channelStyle.Render(t.Channel))
+		url := "    " + urlStyle.Render(trackURL(t))
 		sb.WriteString(title + "\n")
 		sb.WriteString(info + "\n")
+		sb.WriteString(url + "\n")
 	}
 
 	if end < len(pl.Tracks) {

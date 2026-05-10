@@ -21,7 +21,7 @@ func renderResults(videos []youtube.Video, cursor int, height int, canLoadMore b
 		lines := 0
 		for i := start; i < end; i++ {
 			if i < len(videos) {
-				lines += 2
+				lines += 3
 			} else {
 				lines++
 			}
@@ -71,9 +71,11 @@ func renderResults(videos []youtube.Video, cursor int, height int, canLoadMore b
 			durationStyle.Render(v.Duration),
 			viewCountStyle.Render(formatViewCount(v.ViewCount)),
 		)
+		url := "    " + urlStyle.Render(videoURL(v))
 
 		sb.WriteString(title + "\n")
 		sb.WriteString(info + "\n")
+		sb.WriteString(url + "\n")
 		if i < end-1 {
 			sb.WriteString("\n")
 		}
@@ -84,6 +86,16 @@ func renderResults(videos []youtube.Video, cursor int, height int, canLoadMore b
 	}
 
 	return sb.String()
+}
+
+func videoURL(v youtube.Video) string {
+	if v.URL != "" {
+		return v.URL
+	}
+	if v.ID != "" {
+		return fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID)
+	}
+	return ""
 }
 
 func formatViewCount(count uint64) string {
