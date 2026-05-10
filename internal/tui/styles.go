@@ -83,9 +83,13 @@ var (
 
 	// Visualizer row palette: cyan tones instead of rainbow bands.
 	vizRowStyles = []lipgloss.Style{
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#0E4A5E")),
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#155E75")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#0E7490")),
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#0891B2")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#06B6D4")),
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#22D3EE")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#67E8F9")),
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#A5F3FC")),
 	}
 )

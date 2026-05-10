@@ -17,7 +17,7 @@ var preparingIcons = []string{
 }
 
 const (
-	visualizerHeight     = 4
+	visualizerHeight     = 8
 	visualizerBarWidth   = 2
 	visualizerBarSpacing = 1
 )
