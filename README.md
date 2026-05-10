@@ -38,7 +38,7 @@ brew install yt-dlp
 pip install yt-dlp
 ```
 
-### deno 설치 (필수)
+### deno 설치
 
 YouTube가 최근 영상 정보 추출 시 JavaScript 실행을 요구하는 흐름을
 늘렸기 때문에, JS 런타임이 없으면 일부 영상(특히 Shorts와 최신
