@@ -748,8 +748,8 @@ func (m Model) View() string {
 	}
 
 	// Calculate available height for list content
-	// Reserve lines: title(2) + tabs(2) + status(2) + player(2) + help(2) = ~10
-	availableHeight := m.height - 10
+	// Reserve lines: title(2) + tabs(2) + status(2) + player(2) + visualizer + help(2)
+	availableHeight := m.height - (9 + visualizerHeight)
 	if availableHeight < 3 {
 		availableHeight = 3
 	}

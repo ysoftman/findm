@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/ysoftman/findm/internal/player"
@@ -10,6 +11,14 @@ import (
 
 var playingIcons = []string{"♪ Playing", "♫ Playing", "♬ Playing", "♫ Playing"}
 var preparingIcons = []string{"⏳ Preparing.", "⏳ Preparing..", "⏳ Preparing..."}
+
+const (
+	visualizerHeight     = 4
+	visualizerBarWidth   = 2
+	visualizerBarSpacing = 1
+)
+
+var visualizerBlocks = []rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
 
 func animatedStateString(state player.State, frame int) string {
 	// Slow down icon animation (~1s per step at 100ms tick)
@@ -70,53 +79,127 @@ func renderVisualizer(viz *visualizer.Visualizer, width int) string {
 		return ""
 	}
 
-	blocks := []rune{' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
-
 	var sb strings.Builder
-	sb.WriteString("  ")
-	for i, v := range values {
-		idx := int(v * float64(len(blocks)-1))
-		if idx < 0 {
-			idx = 0
-		}
-		if idx >= len(blocks) {
-			idx = len(blocks) - 1
-		}
 
-		ch := string(blocks[idx])
+	prefix := ""
+	availableWidth := width - len(prefix)
+	if availableWidth <= 0 {
+		return ""
+	}
 
-		// Show peak marker if peak is significantly above current value
-		isPeak := false
-		if i < len(peaks) && peaks[i]-v > 0.15 && peaks[i] > 0.3 {
-			peakIdx := int(peaks[i] * float64(len(blocks)-1))
-			if peakIdx >= len(blocks) {
-				peakIdx = len(blocks) - 1
+	barCount := visualizerBarCount(len(values), availableWidth)
+	if barCount <= 0 {
+		return ""
+	}
+	spacingWidth := (barCount - 1) * visualizerBarSpacing
+	contentWidth := availableWidth - spacingWidth
+	if contentWidth <= 0 {
+		return ""
+	}
+
+	for row := visualizerHeight; row >= 1; row-- {
+		if row != visualizerHeight {
+			sb.WriteByte('\n')
+		}
+		sb.WriteString(prefix)
+
+		for bar := 0; bar < barCount; bar++ {
+			barWidth := ((bar + 1) * contentWidth / barCount) - (bar * contentWidth / barCount)
+			if barWidth <= 0 {
+				continue
 			}
-			if peakIdx > idx {
-				ch = string(blocks[peakIdx])
-				isPeak = true
+
+			value := interpolatedVisualizerValue(values, bar, barCount)
+			peakValue := interpolatedVisualizerValue(peaks, bar, barCount)
+			ch := visualizerRowChar(value, peakValue, row)
+
+			switch ch {
+			case " ":
+				sb.WriteString(strings.Repeat(ch, barWidth))
+			case "▀":
+				sb.WriteString(vizPeakStyle.Render(strings.Repeat(ch, barWidth)))
+			default:
+				sb.WriteString(renderVisualizerCell(strings.Repeat(ch, barWidth), row))
+			}
+
+			if bar < barCount-1 {
+				sb.WriteString(strings.Repeat(" ", visualizerBarSpacing))
 			}
 		}
-
-		// Color from gradient based on value (0.0-1.0 → 8 color levels)
-		var rendered string
-		if isPeak {
-			rendered = vizPeakStyle.Render(ch)
-		} else {
-			ci := int(v * float64(len(vizGradient)-1))
-			if ci < 0 {
-				ci = 0
-			}
-			if ci >= len(vizGradient) {
-				ci = len(vizGradient) - 1
-			}
-			rendered = vizGradient[ci].Render(ch)
-		}
-
-		sb.WriteString(rendered)
 	}
 
 	return sb.String()
+}
+
+func visualizerBarCount(valueCount, width int) int {
+	if valueCount <= 0 || width <= 0 {
+		return 0
+	}
+
+	count := (width + visualizerBarSpacing) / (visualizerBarWidth + visualizerBarSpacing)
+	if count < 1 {
+		count = 1
+	}
+	if count > valueCount {
+		count = valueCount
+	}
+	return count
+}
+
+func interpolatedVisualizerValue(values []float64, col, width int) float64 {
+	if len(values) == 0 || width <= 0 {
+		return 0
+	}
+	if len(values) == 1 || width == 1 {
+		return values[0]
+	}
+
+	position := float64(col) * float64(len(values)-1) / float64(width-1)
+	left := int(math.Floor(position))
+	right := left + 1
+	if right >= len(values) {
+		return values[left]
+	}
+
+	blend := position - float64(left)
+	return values[left]*(1-blend) + values[right]*blend
+}
+
+func visualizerRowChar(value, peakValue float64, row int) string {
+	rowBottom := float64(row-1) / float64(visualizerHeight)
+	rowTop := float64(row) / float64(visualizerHeight)
+
+	if value >= rowTop {
+		return "█"
+	}
+	if value > rowBottom {
+		fill := (value - rowBottom) / (rowTop - rowBottom)
+		idx := int(math.Ceil(fill*float64(len(visualizerBlocks)))) - 1
+		if idx < 0 {
+			idx = 0
+		}
+		if idx >= len(visualizerBlocks) {
+			idx = len(visualizerBlocks) - 1
+		}
+		return string(visualizerBlocks[idx])
+	}
+
+	peakRow := int(math.Ceil(peakValue * float64(visualizerHeight)))
+	if peakRow == row && peakValue-value > 0.15 && peakValue > 0.3 {
+		return "▀"
+	}
+	return " "
+}
+
+func renderVisualizerCell(ch string, row int) string {
+	styleIdx := row - 1
+	if styleIdx < 0 {
+		styleIdx = 0
+	}
+	if styleIdx >= len(vizRowStyles) {
+		styleIdx = len(vizRowStyles) - 1
+	}
+	return vizRowStyles[styleIdx].Render(ch)
 }
 
 func renderProgressBar(pos, dur float64, width int) string {
