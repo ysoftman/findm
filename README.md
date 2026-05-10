@@ -42,14 +42,6 @@ yt-dlp는 기본으로 `deno`를 인식하므로 설치만 해두면 됩니다.
 ```bash
 # macOS
 brew install deno
-
-# 다른 플랫폼은 https://deno.com/ 참고
-```
-
-다른 JS 런타임을 쓰고 싶다면 yt-dlp에 명시할 수 있습니다.
-
-```bash
-yt-dlp --js-runtimes node ...
 ```
 
 참고: <https://github.com/yt-dlp/yt-dlp/wiki/EJS>
