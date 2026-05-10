@@ -23,7 +23,7 @@ func tickCmd() tea.Cmd {
 }
 
 func vizTickCmd() tea.Cmd {
-	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }

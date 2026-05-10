@@ -99,11 +99,6 @@ func renderVisualizer(viz *visualizer.Visualizer, width int) string {
 	if barCount <= 0 {
 		return ""
 	}
-	spacingWidth := (barCount - 1) * visualizerBarSpacing
-	contentWidth := availableWidth - spacingWidth
-	if contentWidth <= 0 {
-		return ""
-	}
 
 	for row := visualizerHeight; row >= 1; row-- {
 		if row != visualizerHeight {
@@ -112,10 +107,7 @@ func renderVisualizer(viz *visualizer.Visualizer, width int) string {
 		sb.WriteString(prefix)
 
 		for bar := 0; bar < barCount; bar++ {
-			barWidth := ((bar + 1) * contentWidth / barCount) - (bar * contentWidth / barCount)
-			if barWidth <= 0 {
-				continue
-			}
+			barWidth := visualizerBarWidth
 
 			value := interpolatedVisualizerValue(values, bar, barCount)
 			peakValue := interpolatedVisualizerValue(peaks, bar, barCount)
