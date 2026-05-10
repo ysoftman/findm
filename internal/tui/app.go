@@ -864,11 +864,11 @@ func helpText(view View) string {
 	case SearchView:
 		return "Enter: search  Tab: playlists  Ctrl+C: quit"
 	case ResultsView:
-		return "j/k: move  Enter: play/load more  n/p: next/prev  Space: pause  s: stop  h/l: seek  +/-: vol  r: recommend  a: add  /: search  q: quit"
+		return "j/k: move  Enter: play/load more  n/p: next/prev  Space: pause  s: stop  h/l: seek  +/-: vol  r: recommend  a: add  Tab: playlists  /: search  q: quit"
 	case PlaylistListView:
 		return "j/k: move  Enter: open  c: create  d: delete  Tab: search  Esc: back  q: quit"
 	case PlaylistDetailView:
-		return "j/k: move  Enter: play  n/p: next/prev  Space: pause  s: stop  ←→: seek  +/-: vol  d: remove  Esc: back  q: quit"
+		return "j/k: move  Enter: play  n/p: next/prev  Space: pause  s: stop  ←→: seek  +/-: vol  d: remove  Tab: search  Esc: back  q: quit"
 	default:
 		return ""
 	}
