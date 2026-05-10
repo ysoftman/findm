@@ -9,12 +9,6 @@ TUI 인터페이스를 제공합니다.
 
 ## 사전 요구 사항
 
-- [Go](https://go.dev/) 1.21+
-- [mpv](https://mpv.io/) - 오디오 재생 엔진
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - YouTube 검색 및 메타데이터 추출
-- [deno](https://deno.com/) - yt-dlp의 JavaScript 런타임
-  (YouTube Shorts·최신 영상 추출에 필요)
-
 ### mpv 설치
 
 ```bash
@@ -69,15 +63,7 @@ go install github.com/ysoftman/findm@latest
 소스에서 빌드:
 
 ```bash
-git clone https://github.com/ysoftman/findm.git
-cd findm
 go build -o findm .
-```
-
-버전을 지정하여 빌드:
-
-```bash
-go build -ldflags "-X main.Version=1.0.0" -o findm .
 ```
 
 버전을 지정하지 않으면 타이틀에 `dev`로 표시됩니다.
@@ -99,7 +85,3 @@ GitHub에서 태그를 push하면 GitHub Actions가
 
 설정 디렉토리는 `$XDG_CONFIG_HOME/findm/`을 따르며,
 미설정 시 `~/.config/findm/`이 기본값입니다.
-
-## 라이선스
-
-MIT
