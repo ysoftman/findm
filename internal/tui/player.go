@@ -82,7 +82,6 @@ func renderVisualizer(viz *visualizer.Visualizer, width int) string {
 	}
 
 	values := viz.Values()
-	peaks := viz.Peaks()
 	if len(values) == 0 {
 		return ""
 	}
@@ -110,15 +109,11 @@ func renderVisualizer(viz *visualizer.Visualizer, width int) string {
 			barWidth := visualizerBarWidth
 
 			value := interpolatedVisualizerValue(values, bar, barCount)
-			peakValue := interpolatedVisualizerValue(peaks, bar, barCount)
-			ch := visualizerRowChar(value, peakValue, row)
+			ch := visualizerRowChar(value, row)
 
-			switch ch {
-			case " ":
+			if ch == " " {
 				sb.WriteString(strings.Repeat(ch, barWidth))
-			case "▀":
-				sb.WriteString(vizPeakStyle.Render(strings.Repeat(ch, barWidth)))
-			default:
+			} else {
 				sb.WriteString(renderVisualizerCell(strings.Repeat(ch, barWidth), row))
 			}
 
@@ -165,7 +160,7 @@ func interpolatedVisualizerValue(values []float64, col, width int) float64 {
 	return values[left]*(1-blend) + values[right]*blend
 }
 
-func visualizerRowChar(value, peakValue float64, row int) string {
+func visualizerRowChar(value float64, row int) string {
 	rowBottom := float64(row-1) / float64(visualizerHeight)
 	rowTop := float64(row) / float64(visualizerHeight)
 
@@ -184,10 +179,6 @@ func visualizerRowChar(value, peakValue float64, row int) string {
 		return string(visualizerBlocks[idx])
 	}
 
-	peakRow := int(math.Ceil(peakValue * float64(visualizerHeight)))
-	if peakRow == row && peakValue-value > 0.15 && peakValue > 0.3 {
-		return "▀"
-	}
 	return " "
 }
 

@@ -28,7 +28,6 @@ type Visualizer struct {
 	mu         sync.Mutex
 	values     []float64
 	targets    []float64
-	peaks      []float64
 	running    bool
 	stopCh     chan struct{}
 	cmd        *exec.Cmd
@@ -40,7 +39,6 @@ func New() *Visualizer {
 	return &Visualizer{
 		values:  make([]float64, bars),
 		targets: make([]float64, bars),
-		peaks:   make([]float64, bars),
 	}
 }
 
@@ -110,20 +108,10 @@ func (v *Visualizer) Values() []float64 {
 	return out
 }
 
-// Peaks returns a copy of the current peak values (0.0 - 1.0).
-func (v *Visualizer) Peaks() []float64 {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	out := make([]float64, len(v.peaks))
-	copy(out, v.peaks)
-	return out
-}
-
 func (v *Visualizer) resetLocked() {
 	for i := range v.values {
 		v.values[i] = 0
 		v.targets[i] = 0
-		v.peaks[i] = 0
 	}
 }
 
@@ -311,15 +299,6 @@ func (v *Visualizer) applyFrame(frame []float64) {
 		} else {
 			v.values[i] = current + (target-current)*0.45
 		}
-
-		if v.values[i] > v.peaks[i] {
-			v.peaks[i] = v.values[i]
-		} else {
-			v.peaks[i] -= 0.045
-			if v.peaks[i] < 0 {
-				v.peaks[i] = 0
-			}
-		}
 	}
 }
 
@@ -437,15 +416,6 @@ func (v *Visualizer) animate(stopCh chan struct{}) {
 				}
 				if v.values[i] < 0.0 {
 					v.values[i] = 0.0
-				}
-
-				if v.values[i] > v.peaks[i] {
-					v.peaks[i] = v.values[i]
-				} else {
-					v.peaks[i] -= 0.03
-					if v.peaks[i] < 0 {
-						v.peaks[i] = 0
-					}
 				}
 			}
 			v.mu.Unlock()

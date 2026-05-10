@@ -88,7 +88,4 @@ var (
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#22D3EE")),
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#A5F3FC")),
 	}
-
-	vizPeakStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#ECFEFF"))
 )
