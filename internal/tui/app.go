@@ -34,7 +34,7 @@ func (m *Model) handlePlayerErr(err error) {
 		return
 	}
 	if errors.Is(err, player.ErrNotReady) {
-		m.statusMsg = "Preparing playback..."
+		m.statusMsg = preparingPlaybackMsg
 	} else {
 		m.errorMsg = err.Error()
 	}
@@ -210,17 +210,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if state != player.Stopped {
 			switch state {
 			case player.Preparing:
-				m.statusMsg = "Preparing playback..."
+				m.statusMsg = preparingPlaybackMsg
 				m.viz.Stop()
 			case player.Playing:
-				if m.statusMsg == "Preparing playback..." {
+				if m.statusMsg == preparingPlaybackMsg {
 					m.statusMsg = ""
 				}
 				if !m.viz.IsRunning() {
 					m.viz.Start()
 				}
 			}
-			if m.viz.IsRunning() {
+			if state == player.Preparing || m.viz.IsRunning() {
 				return m, vizTickCmd()
 			}
 			return m, tickCmd()
@@ -812,7 +812,11 @@ func (m Model) View() string {
 	if m.errorMsg != "" {
 		statusBlock = "\n" + errorStyle.Render("Error: "+m.errorMsg) + "\n"
 	} else if m.statusMsg != "" && (!m.loading || m.view != SearchView) {
-		statusBlock = "\n" + statusStyle.Render(m.statusMsg) + "\n"
+		text := m.statusMsg
+		if text == preparingPlaybackMsg {
+			text = animatedLoadingMessage(text, m.animFrame)
+		}
+		statusBlock = "\n" + statusStyle.Render(text) + "\n"
 	}
 
 	playerBlock := "\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n"
