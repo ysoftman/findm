@@ -196,6 +196,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.errorMsg = msg.err.Error()
 			return m, nil
 		}
+		if len(msg.results) == 0 {
+			m.statusMsg = "Found 0 recommendations"
+			return m, nil
+		}
 		m.results = msg.results
 		m.cursor = 0
 		m.view = ResultsView
