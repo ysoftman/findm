@@ -91,9 +91,10 @@ type Model struct {
 	animFrame   int
 
 	// Search results
-	results     []youtube.Video
-	searchQuery string
-	cursor      int
+	results        []youtube.Video
+	searchQuery    string
+	cursor         int
+	hasMoreResults bool
 
 	// Playlist state
 	playlists       []string
@@ -166,6 +167,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.results = msg.results
 		m.cursor = 0
 		m.view = ResultsView
+		m.hasMoreResults = len(msg.results) > 0
 		m.statusMsg = fmt.Sprintf("Found %d results", len(msg.results))
 		return m, nil
 
@@ -177,8 +179,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if len(msg.results) > 0 {
 			m.results = append(m.results, msg.results...)
+			m.hasMoreResults = true
 			m.statusMsg = fmt.Sprintf("Loaded %d more results (total: %d)", len(msg.results), len(m.results))
 		} else {
+			m.hasMoreResults = false
+			if m.cursor >= len(m.results) && len(m.results) > 0 {
+				m.cursor = len(m.results) - 1
+			}
 			m.statusMsg = "No more results available"
 		}
 		return m, nil
@@ -192,6 +199,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.results = msg.results
 		m.cursor = 0
 		m.view = ResultsView
+		m.searchQuery = ""
+		m.hasMoreResults = false
 		m.statusMsg = fmt.Sprintf("Found %d recommendations", len(msg.results))
 		return m, nil
 
@@ -353,10 +362,38 @@ func (m Model) handleSearchView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m Model) canLoadMoreResults() bool {
+	return m.searchQuery != "" && m.hasMoreResults && len(m.results) > 0 && !m.loading
+}
+
+func (m Model) isLoadMoreSelected() bool {
+	return m.canLoadMoreResults() && m.cursor == len(m.results)
+}
+
+func (m Model) resultCursorMax() int {
+	if m.canLoadMoreResults() {
+		return len(m.results)
+	}
+	if len(m.results) == 0 {
+		return 0
+	}
+	return len(m.results) - 1
+}
+
+func (m *Model) loadMoreResults() tea.Cmd {
+	if !m.canLoadMoreResults() {
+		return nil
+	}
+	m.loading = true
+	m.statusMsg = "Loading more results..."
+	offset := int64(len(m.results))
+	return performSearchMore(m.client, m.searchQuery, offset)
+}
+
 func (m Model) handleResultsView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
-		if m.cursor < len(m.results)-1 {
+		if m.cursor < m.resultCursorMax() {
 			m.cursor++
 		}
 	case "k", "up":
@@ -364,7 +401,10 @@ func (m Model) handleResultsView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cursor--
 		}
 	case "enter":
-		if len(m.results) > 0 {
+		if m.isLoadMoreSelected() {
+			return m, m.loadMoreResults()
+		}
+		if len(m.results) > 0 && m.cursor < len(m.results) {
 			v := m.results[m.cursor]
 			if err := m.player.Play(v.URL, v.Title); err != nil {
 				m.errorMsg = err.Error()
@@ -425,21 +465,18 @@ func (m Model) handleResultsView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		vol := m.player.GetVolume() - 10
 		m.handlePlayerErr(m.player.SetVolume(vol))
 	case "r":
-		if len(m.results) > 0 {
+		if len(m.results) > 0 && m.cursor < len(m.results) {
 			v := m.results[m.cursor]
 			m.loading = true
 			m.statusMsg = "Finding recommendations..."
 			return m, performRecommend(m.client, v.ID)
 		}
 	case "L":
-		if m.searchQuery != "" {
-			m.loading = true
-			m.statusMsg = "Loading more results..."
-			offset := int64(len(m.results))
-			return m, performSearchMore(m.client, m.searchQuery, offset)
+		if cmd := m.loadMoreResults(); cmd != nil {
+			return m, cmd
 		}
 	case "a":
-		if len(m.results) > 0 {
+		if len(m.results) > 0 && m.cursor < len(m.results) {
 			m.addingToPlaylist = true
 			m.addPlaylistCursor = 0
 			return m, m.loadPlaylists()
@@ -724,7 +761,28 @@ func (m Model) View() string {
 		if len(m.playlists) == 0 {
 			sb.WriteString(normalItemStyle.Render("No playlists yet. Press 'c' to create one.") + "\n")
 		} else {
-			for i, name := range m.playlists {
+			helpBlock := helpStyle.Render("\nj/k: move  Enter: select  c: create new  Esc: cancel") + "\n"
+			playerBlock := "\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n"
+			availableHeight := m.height - 2 - renderedLineCount(helpBlock) - renderedLineCount(playerBlock)
+			if availableHeight < 1 {
+				availableHeight = 1
+			}
+			visibleCount := fittedVisibleCount(len(m.playlists), m.addPlaylistCursor, availableHeight, func(start, end int) int {
+				lines := end - start
+				if start > 0 {
+					lines++
+				}
+				if end < len(m.playlists) {
+					lines++
+				}
+				return lines
+			})
+			start, end := viewportBounds(len(m.playlists), m.addPlaylistCursor, visibleCount)
+			if start > 0 {
+				sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↑ %d more", start)) + "\n")
+			}
+			for i := start; i < end; i++ {
+				name := m.playlists[i]
 				prefix := "  "
 				style := normalItemStyle
 				if i == m.addPlaylistCursor {
@@ -732,6 +790,9 @@ func (m Model) View() string {
 					style = selectedItemStyle
 				}
 				sb.WriteString(style.Render(fmt.Sprintf("%s%s", prefix, name)) + "\n")
+			}
+			if end < len(m.playlists) {
+				sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↓ %d more", len(m.playlists)-end)) + "\n")
 			}
 		}
 		sb.WriteString(helpStyle.Render("\nj/k: move  Enter: select  c: create new  Esc: cancel") + "\n")
@@ -747,58 +808,68 @@ func (m Model) View() string {
 		return sb.String()
 	}
 
-	// Calculate available height for list content
-	// Reserve lines: title(2) + tabs(2) + status(2) + player(2) + visualizer + help(2)
-	availableHeight := m.height - (9 + visualizerHeight)
-	if availableHeight < 3 {
-		availableHeight = 3
+	statusBlock := ""
+	if m.errorMsg != "" {
+		statusBlock = "\n" + errorStyle.Render("Error: "+m.errorMsg) + "\n"
+	} else if m.statusMsg != "" && (!m.loading || m.view != SearchView) {
+		statusBlock = "\n" + statusStyle.Render(m.statusMsg) + "\n"
+	}
+
+	playerBlock := "\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n"
+	visualizerBlock := ""
+	if vizLine := renderVisualizer(m.viz, m.width); vizLine != "" {
+		visualizerBlock = vizLine + "\n"
+	}
+	helpBlock := helpStyle.Render(helpText(m.view)) + "\n"
+
+	availableHeight := m.height -
+		2 -
+		renderedLineCount(statusBlock) -
+		renderedLineCount(playerBlock) -
+		renderedLineCount(visualizerBlock) -
+		renderedLineCount(helpBlock)
+	if availableHeight < 1 {
+		availableHeight = 1
 	}
 
 	// Main content
+	var content string
 	switch m.view {
 	case SearchView:
-		sb.WriteString("Search: " + m.searchInput.View() + "\n")
+		content = "Search: " + m.searchInput.View()
 		if m.loading {
-			sb.WriteString("\n" + statusStyle.Render("Searching...") + "\n")
+			content += "\n\n" + statusStyle.Render("Searching...")
 		}
 	case ResultsView:
-		sb.WriteString(renderResults(m.results, m.cursor, availableHeight) + "\n")
+		content = renderResults(m.results, m.cursor, availableHeight, m.canLoadMoreResults())
 	case PlaylistListView:
-		sb.WriteString(renderPlaylistList(m.playlists, m.playlistCursor, availableHeight) + "\n")
+		content = renderPlaylistList(m.playlists, m.playlistCursor, availableHeight)
 	case PlaylistDetailView:
 		if m.currentPlaylist != nil {
-			sb.WriteString(renderPlaylistDetail(m.currentPlaylist, m.trackCursor, availableHeight) + "\n")
+			content = renderPlaylistDetail(m.currentPlaylist, m.trackCursor, availableHeight)
 		}
 	}
+	sb.WriteString(strings.TrimRight(content, "\n"))
 
-	// Status/Error (skip statusMsg when loading to avoid duplicate)
-	if m.errorMsg != "" {
-		sb.WriteString("\n" + errorStyle.Render("Error: "+m.errorMsg) + "\n")
-	} else if m.statusMsg != "" && (!m.loading || m.view != SearchView) {
-		sb.WriteString("\n" + statusStyle.Render(m.statusMsg) + "\n")
-	}
-
-	// Player bar
-	sb.WriteString("\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n")
-
-	// Visualizer
-	if vizLine := renderVisualizer(m.viz, m.width); vizLine != "" {
-		sb.WriteString(vizLine + "\n")
-	}
-
-	// Help
-	var help string
-	switch m.view {
-	case SearchView:
-		help = "Enter: search  Tab: playlists  Ctrl+C: quit"
-	case ResultsView:
-		help = "j/k: move  Enter: play  n/p: next/prev  Space: pause  s: stop  h/l: seek  +/-: vol  r: recommend  a: add  L: more  /: search  q: quit"
-	case PlaylistListView:
-		help = "j/k: move  Enter: open  c: create  d: delete  Tab: search  Esc: back  q: quit"
-	case PlaylistDetailView:
-		help = "j/k: move  Enter: play  n/p: next/prev  Space: pause  s: stop  ←→: seek  +/-: vol  d: remove  Esc: back  q: quit"
-	}
-	sb.WriteString(helpStyle.Render(help) + "\n")
+	sb.WriteString(statusBlock)
+	sb.WriteString(playerBlock)
+	sb.WriteString(visualizerBlock)
+	sb.WriteString(helpBlock)
 
 	return sb.String()
+}
+
+func helpText(view View) string {
+	switch view {
+	case SearchView:
+		return "Enter: search  Tab: playlists  Ctrl+C: quit"
+	case ResultsView:
+		return "j/k: move  Enter: play/load more  n/p: next/prev  Space: pause  s: stop  h/l: seek  +/-: vol  r: recommend  a: add  /: search  q: quit"
+	case PlaylistListView:
+		return "j/k: move  Enter: open  c: create  d: delete  Tab: search  Esc: back  q: quit"
+	case PlaylistDetailView:
+		return "j/k: move  Enter: play  n/p: next/prev  Space: pause  s: stop  ←→: seek  +/-: vol  d: remove  Esc: back  q: quit"
+	default:
+		return ""
+	}
 }

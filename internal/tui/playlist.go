@@ -15,33 +15,17 @@ func renderPlaylistList(names []string, cursor int, height int) string {
 	var sb strings.Builder
 	sb.WriteString(titleStyle.Render("Playlists") + "\n\n")
 
-	// Each playlist item takes 1 line
-	visibleCount := len(names)
-	if height > 0 {
-		// Subtract 2 lines for title + blank line
-		available := height - 2
-		if available > 0 {
-			visibleCount = available
+	visibleCount := fittedVisibleCount(len(names), cursor, height, func(start, end int) int {
+		lines := 2 + end - start
+		if start > 0 {
+			lines++
 		}
-	}
-	if visibleCount > len(names) {
-		visibleCount = len(names)
-	}
-
-	start := 0
-	if cursor >= visibleCount {
-		start = cursor - visibleCount + 1
-	}
-	if start+visibleCount > len(names) {
-		start = len(names) - visibleCount
-	}
-	if start < 0 {
-		start = 0
-	}
-	end := start + visibleCount
-	if end > len(names) {
-		end = len(names)
-	}
+		if end < len(names) {
+			lines++
+		}
+		return lines
+	})
+	start, end := viewportBounds(len(names), cursor, visibleCount)
 
 	if start > 0 {
 		sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↑ %d more", start)) + "\n")
@@ -74,37 +58,17 @@ func renderPlaylistDetail(pl *playlist.Playlist, cursor int, height int) string 
 		return sb.String()
 	}
 
-	// Each track takes 2 lines (title + info)
-	itemHeight := 2
-	visibleCount := len(pl.Tracks)
-	if height > 0 {
-		// Subtract 2 lines for title + blank line
-		available := height - 2
-		if available > 0 {
-			visibleCount = available / itemHeight
+	visibleCount := fittedVisibleCount(len(pl.Tracks), cursor, height, func(start, end int) int {
+		lines := 2 + (end-start)*2
+		if start > 0 {
+			lines++
 		}
-		if visibleCount < 1 {
-			visibleCount = 1
+		if end < len(pl.Tracks) {
+			lines++
 		}
-	}
-	if visibleCount > len(pl.Tracks) {
-		visibleCount = len(pl.Tracks)
-	}
-
-	start := 0
-	if cursor >= visibleCount {
-		start = cursor - visibleCount + 1
-	}
-	if start+visibleCount > len(pl.Tracks) {
-		start = len(pl.Tracks) - visibleCount
-	}
-	if start < 0 {
-		start = 0
-	}
-	end := start + visibleCount
-	if end > len(pl.Tracks) {
-		end = len(pl.Tracks)
-	}
+		return lines
+	})
+	start, end := viewportBounds(len(pl.Tracks), cursor, visibleCount)
 
 	if start > 0 {
 		sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↑ %d more", start)) + "\n")

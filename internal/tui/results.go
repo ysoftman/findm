@@ -7,39 +7,37 @@ import (
 	"github.com/ysoftman/findm/internal/youtube"
 )
 
-func renderResults(videos []youtube.Video, cursor int, height int) string {
+func renderResults(videos []youtube.Video, cursor int, height int, canLoadMore bool) string {
 	if len(videos) == 0 {
 		return normalItemStyle.Render("No results found.")
 	}
 
-	// Each item takes 3 lines (title + info + blank line)
-	itemHeight := 3
-	visibleCount := len(videos)
-	if height > 0 {
-		visibleCount = height / itemHeight
-		if visibleCount < 1 {
-			visibleCount = 1
-		}
-	}
-	if visibleCount > len(videos) {
-		visibleCount = len(videos)
+	totalItems := len(videos)
+	if canLoadMore {
+		totalItems++
 	}
 
-	// Calculate viewport start based on cursor position
-	start := 0
-	if cursor >= visibleCount {
-		start = cursor - visibleCount + 1
-	}
-	if start+visibleCount > len(videos) {
-		start = len(videos) - visibleCount
-	}
-	if start < 0 {
-		start = 0
-	}
-	end := start + visibleCount
-	if end > len(videos) {
-		end = len(videos)
-	}
+	visibleCount := fittedVisibleCount(totalItems, cursor, height, func(start, end int) int {
+		lines := 0
+		for i := start; i < end; i++ {
+			if i < len(videos) {
+				lines += 2
+			} else {
+				lines++
+			}
+			if i < end-1 {
+				lines++
+			}
+		}
+		if start > 0 {
+			lines++
+		}
+		if end < totalItems {
+			lines += 2
+		}
+		return lines
+	})
+	start, end := viewportBounds(totalItems, cursor, visibleCount)
 
 	var sb strings.Builder
 
@@ -48,6 +46,17 @@ func renderResults(videos []youtube.Video, cursor int, height int) string {
 	}
 
 	for i := start; i < end; i++ {
+		if i == len(videos) {
+			prefix := "  "
+			style := normalItemStyle
+			if i == cursor {
+				prefix = "▸ "
+				style = selectedItemStyle
+			}
+			sb.WriteString(style.Render(prefix + "Load more results..."))
+			continue
+		}
+
 		v := videos[i]
 		prefix := "  "
 		style := normalItemStyle
@@ -70,8 +79,8 @@ func renderResults(videos []youtube.Video, cursor int, height int) string {
 		}
 	}
 
-	if end < len(videos) {
-		sb.WriteString("\n" + scrollIndicatorStyle.Render(fmt.Sprintf("  ↓ %d more", len(videos)-end)))
+	if end < totalItems {
+		sb.WriteString("\n" + scrollIndicatorStyle.Render(fmt.Sprintf("  ↓ %d more", totalItems-end)))
 	}
 
 	return sb.String()
