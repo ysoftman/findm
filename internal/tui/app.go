@@ -208,6 +208,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusMsg = fmt.Sprintf("Found %d recommendations", len(msg.results))
 		return m, nil
 
+	case expandMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.errorMsg = msg.err.Error()
+			return m, nil
+		}
+		if len(msg.results) == 0 {
+			m.statusMsg = "No videos found"
+			return m, nil
+		}
+		m.results = msg.results
+		m.cursor = 0
+		m.view = ResultsView
+		m.searchQuery = ""
+		m.hasMoreResults = false
+		m.statusMsg = fmt.Sprintf("Showing %d videos from %s", len(msg.results), msg.source)
+		return m, nil
+
 	case tickMsg:
 		m.animFrame++
 		state := m.player.GetState()
@@ -348,9 +366,32 @@ func (m Model) handleSearchView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if query == "" {
 			return m, nil
 		}
+		m.searchInput.Blur()
+
+		if youtube.IsYouTubeWatchURL(query) {
+			if err := m.player.Play(query, query); err != nil {
+				m.errorMsg = err.Error()
+				return m, nil
+			}
+			m.autoPlay = false
+			m.playingTrackIdx = -1
+			m.statusMsg = ""
+			m.view = ResultsView
+			return m, tickCmd()
+		}
+		if youtube.IsExpandableURL(query) {
+			m.loading = true
+			m.statusMsg = "Loading..."
+			return m, performExpandRaw(m.client, query, query)
+		}
+		if youtube.IsChannelHandle(query) {
+			m.loading = true
+			m.statusMsg = "Loading channel..."
+			return m, performExpandRaw(m.client, youtube.ChannelHandleURL(query), query)
+		}
+
 		m.loading = true
 		m.statusMsg = "Searching..."
-		m.searchInput.Blur()
 		m.searchQuery = query
 		return m, performSearch(m.client, query)
 	case "esc":
@@ -410,6 +451,11 @@ func (m Model) handleResultsView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if len(m.results) > 0 && m.cursor < len(m.results) {
 			v := m.results[m.cursor]
+			if !v.Kind.Playable() {
+				m.loading = true
+				m.statusMsg = fmt.Sprintf("Loading %s...", kindLabel(v.Kind))
+				return m, performExpand(m.client, v)
+			}
 			if err := m.player.Play(v.URL, v.Title); err != nil {
 				m.errorMsg = err.Error()
 			} else {
@@ -420,8 +466,8 @@ func (m Model) handleResultsView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case "n":
-		if m.cursor < len(m.results)-1 {
-			m.cursor++
+		if next := nextPlayableIdx(m.results, m.cursor, +1); next >= 0 {
+			m.cursor = next
 			v := m.results[m.cursor]
 			if err := m.player.Play(v.URL, v.Title); err != nil {
 				m.errorMsg = err.Error()
@@ -433,8 +479,8 @@ func (m Model) handleResultsView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case "p":
-		if m.cursor > 0 {
-			m.cursor--
+		if prev := nextPlayableIdx(m.results, m.cursor, -1); prev >= 0 {
+			m.cursor = prev
 			v := m.results[m.cursor]
 			if err := m.player.Play(v.URL, v.Title); err != nil {
 				m.errorMsg = err.Error()
@@ -471,6 +517,10 @@ func (m Model) handleResultsView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		if len(m.results) > 0 && m.cursor < len(m.results) {
 			v := m.results[m.cursor]
+			if !v.Kind.Playable() {
+				m.statusMsg = "Recommend works on videos only"
+				return m, nil
+			}
 			m.loading = true
 			m.statusMsg = "Finding recommendations..."
 			return m, performRecommend(m.client, v.ID)
@@ -481,6 +531,11 @@ func (m Model) handleResultsView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "a":
 		if len(m.results) > 0 && m.cursor < len(m.results) {
+			v := m.results[m.cursor]
+			if !v.Kind.Playable() {
+				m.statusMsg = "Only videos can be added to playlists"
+				return m, nil
+			}
 			m.addingToPlaylist = true
 			m.addPlaylistCursor = 0
 			return m, m.loadPlaylists()
@@ -870,13 +925,13 @@ func (m Model) View() string {
 func helpText(view View) string {
 	switch view {
 	case SearchView:
-		return "Enter: search  Tab: playlists  Ctrl+C: quit"
+		return "Enter: search (text, @handle, publisher, or URL)  Tab: next tab  Ctrl+C: quit"
 	case ResultsView:
-		return "j/k: move  Enter: play/load more  n/p: next/prev  Space: pause  s: stop  h/l: seek  +/-: vol  r: recommend  a: add  Tab: playlists  /: search  q: quit"
+		return "j/k: move  Enter: play / open  n/p: next/prev  Space: pause  s: stop  h/l: seek  +/-: vol  r: recommend  a: add  Tab: next tab  /: search  q: quit"
 	case PlaylistListView:
-		return "j/k: move  Enter: open  c: create  d: delete  Tab: search  Esc: back  q: quit"
+		return "j/k: move  Enter: open  c: create  d: delete  Tab: next tab  Esc: back  q: quit"
 	case PlaylistDetailView:
-		return "j/k: move  Enter: play  n/p: next/prev  Space: pause  s: stop  ←→: seek  +/-: vol  d: remove  Tab: search  Esc: back  q: quit"
+		return "j/k: move  Enter: play  n/p: next/prev  Space: pause  s: stop  ←→: seek  +/-: vol  d: remove  Tab: next tab  Esc: back  q: quit"
 	default:
 		return ""
 	}

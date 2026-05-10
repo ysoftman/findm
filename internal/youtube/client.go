@@ -7,7 +7,19 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-// Video represents a YouTube video with relevant metadata.
+// Kind identifies the kind of a search result entry.
+type Kind int
+
+const (
+	KindVideo Kind = iota
+	KindPlaylist
+	KindChannel
+)
+
+func (k Kind) Playable() bool { return k == KindVideo }
+
+// Video represents a YouTube search result entry.
+// For KindPlaylist / KindChannel, Duration and ViewCount may be empty/zero.
 type Video struct {
 	ID        string
 	Title     string
@@ -15,6 +27,7 @@ type Video struct {
 	Duration  string
 	ViewCount uint64
 	URL       string
+	Kind      Kind
 }
 
 // normalizeText returns the NFC-normalized form of s.

@@ -65,12 +65,20 @@ func renderResults(videos []youtube.Video, cursor int, height int, canLoadMore b
 			style = selectedItemStyle
 		}
 
-		title := style.Render(fmt.Sprintf("%s%s", prefix, v.Title))
-		info := fmt.Sprintf("    %s  %s  %s",
-			channelStyle.Render(v.Channel),
-			durationStyle.Render(v.Duration),
-			viewCountStyle.Render(formatViewCount(v.ViewCount)),
-		)
+		title := style.Render(fmt.Sprintf("%s%s%s", prefix, kindBadge(v.Kind), v.Title))
+		var info string
+		switch v.Kind {
+		case youtube.KindPlaylist:
+			info = "    " + channelStyle.Render("YouTube playlist") + "  " + durationStyle.Render("Press Enter to view")
+		case youtube.KindChannel:
+			info = "    " + channelStyle.Render("YouTube channel") + "  " + durationStyle.Render("Press Enter to view")
+		default:
+			info = fmt.Sprintf("    %s  %s  %s",
+				channelStyle.Render(v.Channel),
+				durationStyle.Render(v.Duration),
+				viewCountStyle.Render(formatViewCount(v.ViewCount)),
+			)
+		}
 		url := "    " + urlStyle.Render(videoURL(v))
 
 		sb.WriteString(title + "\n")
@@ -96,6 +104,40 @@ func videoURL(v youtube.Video) string {
 		return fmt.Sprintf("https://www.youtube.com/watch?v=%s", v.ID)
 	}
 	return ""
+}
+
+func kindLabel(k youtube.Kind) string {
+	switch k {
+	case youtube.KindPlaylist:
+		return "playlist"
+	case youtube.KindChannel:
+		return "channel"
+	default:
+		return "video"
+	}
+}
+
+func kindBadge(k youtube.Kind) string {
+	switch k {
+	case youtube.KindPlaylist:
+		return "[PL] "
+	case youtube.KindChannel:
+		return "[CH] "
+	default:
+		return ""
+	}
+}
+
+func nextPlayableIdx(videos []youtube.Video, from, step int) int {
+	if step == 0 {
+		return -1
+	}
+	for i := from + step; i >= 0 && i < len(videos); i += step {
+		if videos[i].Kind.Playable() {
+			return i
+		}
+	}
+	return -1
 }
 
 func formatViewCount(count uint64) string {

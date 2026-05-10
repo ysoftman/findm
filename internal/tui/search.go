@@ -24,9 +24,16 @@ type recommendMsg struct {
 	err     error
 }
 
+// expandMsg is sent when a playlist/channel's videos have been loaded.
+type expandMsg struct {
+	source  string
+	results []youtube.Video
+	err     error
+}
+
 func newSearchInput() textinput.Model {
 	ti := textinput.New()
-	ti.Placeholder = "Search music... (e.g. 카페 음악, acoustic chill)"
+	ti.Placeholder = "Search music, @handle, publisher, or URL..."
 	ti.CharLimit = 100
 	ti.Width = 60
 	return ti
@@ -50,5 +57,16 @@ func performRecommend(client *youtube.Client, videoID string) tea.Cmd {
 	return func() tea.Msg {
 		results, err := client.Recommend(videoID, 10)
 		return recommendMsg{results: results, err: err}
+	}
+}
+
+func performExpand(client *youtube.Client, v youtube.Video) tea.Cmd {
+	return performExpandRaw(client, v.URL, v.Title)
+}
+
+func performExpandRaw(client *youtube.Client, url, source string) tea.Cmd {
+	return func() tea.Msg {
+		results, err := client.FetchVideosFromURL(url, 100)
+		return expandMsg{source: source, results: results, err: err}
 	}
 }

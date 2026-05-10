@@ -11,13 +11,36 @@ import (
 
 // ytdlpResult represents a single JSON line from yt-dlp output.
 type ytdlpResult struct {
-	ID         string  `json:"id"`
-	Title      string  `json:"title"`
-	Channel    string  `json:"channel"`
-	Duration   float64 `json:"duration"`
-	ViewCount  uint64  `json:"view_count"`
-	WebpageURL string  `json:"webpage_url"`
-	URL        string  `json:"url"`
+	ID           string  `json:"id"`
+	Title        string  `json:"title"`
+	Channel      string  `json:"channel"`
+	Duration     float64 `json:"duration"`
+	ViewCount    uint64  `json:"view_count"`
+	WebpageURL   string  `json:"webpage_url"`
+	URL          string  `json:"url"`
+	IEKey        string  `json:"ie_key"`
+	ExtractorKey string  `json:"extractor_key"`
+}
+
+// classifyKind infers whether the result is a video, playlist, or channel.
+func classifyKind(r ytdlpResult) Kind {
+	extractor := r.ExtractorKey
+	if extractor == "" {
+		extractor = r.IEKey
+	}
+	url := r.WebpageURL
+	if url == "" {
+		url = r.URL
+	}
+	if extractor == "YoutubeTab" || strings.Contains(url, "/playlist") || strings.Contains(url, "list=") || strings.Contains(url, "/@") || strings.Contains(url, "/channel/") {
+		if strings.Contains(url, "list=") || strings.Contains(url, "/playlist") {
+			return KindPlaylist
+		}
+		if strings.Contains(url, "/@") || strings.Contains(url, "/channel/") || strings.HasPrefix(r.ID, "UC") {
+			return KindChannel
+		}
+	}
+	return KindVideo
 }
 
 // Search performs a keyword search for music videos using yt-dlp.
@@ -59,9 +82,17 @@ func (c *Client) Search(query string, maxResults int64, offset int64) ([]Video, 
 		}
 		seen[result.ID] = true
 
+		kind := classifyKind(result)
 		url := result.WebpageURL
 		if url == "" {
-			url = fmt.Sprintf("https://www.youtube.com/watch?v=%s", result.ID)
+			switch kind {
+			case KindChannel:
+				url = fmt.Sprintf("https://www.youtube.com/channel/%s", result.ID)
+			case KindPlaylist:
+				url = fmt.Sprintf("https://www.youtube.com/playlist?list=%s", result.ID)
+			default:
+				url = fmt.Sprintf("https://www.youtube.com/watch?v=%s", result.ID)
+			}
 		}
 
 		videos = append(videos, Video{
@@ -71,6 +102,7 @@ func (c *Client) Search(query string, maxResults int64, offset int64) ([]Video, 
 			Duration:  formatDuration(result.Duration),
 			ViewCount: result.ViewCount,
 			URL:       url,
+			Kind:      kind,
 		})
 	}
 
