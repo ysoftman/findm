@@ -11,14 +11,9 @@ import (
 )
 
 var playingIcons = []string{"♪ Playing", "♫ Playing", "♬ Playing", "♫ Playing"}
-var preparingIcons = []string{"⏳ Preparing.", "⏳ Preparing..", "⏳ Preparing..."}
-var loadingDots = []string{".", "..", "..."}
-
-const preparingPlaybackMsg = "Preparing playback"
-
-func animatedLoadingMessage(base string, frame int) string {
-	slow := frame / 5
-	return base + loadingDots[slow%len(loadingDots)]
+var preparingIcons = []string{
+	"⠋ Preparing", "⠙ Preparing", "⠹ Preparing", "⠸ Preparing", "⠼ Preparing",
+	"⠴ Preparing", "⠦ Preparing", "⠧ Preparing", "⠇ Preparing", "⠏ Preparing",
 }
 
 const (

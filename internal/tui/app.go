@@ -28,16 +28,13 @@ func vizTickCmd() tea.Cmd {
 	})
 }
 
-// handlePlayerErr handles player errors, showing ErrNotReady as status instead of error.
+// handlePlayerErr handles player errors, ignoring ErrNotReady (the player bar
+// already shows the Preparing state via its icon).
 func (m *Model) handlePlayerErr(err error) {
-	if err == nil {
+	if err == nil || errors.Is(err, player.ErrNotReady) {
 		return
 	}
-	if errors.Is(err, player.ErrNotReady) {
-		m.statusMsg = preparingPlaybackMsg
-	} else {
-		m.errorMsg = err.Error()
-	}
+	m.errorMsg = err.Error()
 }
 
 // playTrackAt plays a track from the current playlist at the given index.
@@ -232,12 +229,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if state != player.Stopped {
 			switch state {
 			case player.Preparing:
-				m.statusMsg = preparingPlaybackMsg
 				m.viz.Stop()
 			case player.Playing:
-				if m.statusMsg == preparingPlaybackMsg {
-					m.statusMsg = ""
-				}
 				if !m.viz.IsRunning() {
 					m.viz.Start()
 				}
@@ -876,11 +869,7 @@ func (m Model) View() string {
 	if m.errorMsg != "" {
 		statusBlock = "\n" + errorStyle.Render("Error: "+m.errorMsg) + "\n"
 	} else if m.statusMsg != "" && (!m.loading || m.view != SearchView) {
-		text := m.statusMsg
-		if text == preparingPlaybackMsg {
-			text = animatedLoadingMessage(text, m.animFrame)
-		}
-		statusBlock = "\n" + statusStyle.Render(text) + "\n"
+		statusBlock = "\n" + statusStyle.Render(m.statusMsg) + "\n"
 	}
 
 	playerBlock := "\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n"
