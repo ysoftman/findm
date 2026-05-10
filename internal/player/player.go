@@ -2,11 +2,13 @@ package player
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 )
@@ -34,6 +36,16 @@ type Player struct {
 	socketPath string
 	conn       net.Conn
 	reader     *bufio.Reader
+	lastErr    string // last fatal error from mpv (consumed once)
+}
+
+// ConsumeError returns and clears the most recent fatal mpv error, if any.
+func (p *Player) ConsumeError() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	msg := p.lastErr
+	p.lastErr = ""
+	return msg
 }
 
 // New creates a new Player instance.
@@ -61,12 +73,17 @@ func (p *Player) Play(url, title string) error {
 	// Remove stale socket file
 	_ = os.Remove(p.socketPath)
 
+	logBuf := &bytes.Buffer{}
 	p.cmd = exec.Command("mpv",
 		"--no-video",
-		"--really-quiet",
+		"--quiet",
+		"--msg-level=all=error",
 		"--input-ipc-server="+p.socketPath,
 		url,
 	)
+	// mpv writes its error messages to stdout; capture both streams.
+	p.cmd.Stdout = logBuf
+	p.cmd.Stderr = logBuf
 	if err := p.cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start mpv: %w", err)
 	}
@@ -74,17 +91,28 @@ func (p *Player) Play(url, title string) error {
 	p.state = Preparing
 	p.current = title
 	p.url = url
+	p.lastErr = ""
 	p.done = make(chan struct{}, 1)
+	startedAt := time.Now()
 
 	// Connect IPC socket (non-blocking, retry in background)
 	go p.connectIPC()
 
 	// Wait for completion in background
 	go func() {
-		_ = p.cmd.Wait()
+		exitErr := p.cmd.Wait()
 		p.mu.Lock()
 		defer p.mu.Unlock()
 		if p.url == url {
+			// If mpv exited before reaching Playing state, surface the error.
+			earlyExit := p.state != Playing && p.state != Paused
+			if earlyExit && exitErr != nil {
+				if msg := extractMpvError(logBuf.String()); msg != "" {
+					p.lastErr = msg
+				} else if time.Since(startedAt) < 30*time.Second {
+					p.lastErr = "mpv exited before playback could start"
+				}
+			}
 			p.closeConn()
 			p.state = Stopped
 			p.current = ""
@@ -95,6 +123,29 @@ func (p *Player) Play(url, title string) error {
 	}()
 
 	return nil
+}
+
+// extractMpvError pulls the most informative line out of mpv's stderr.
+func extractMpvError(s string) string {
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// Prefer the inner ytdl error line (contains the YouTube reason).
+		if strings.Contains(line, "[youtube]") || strings.Contains(line, "ERROR:") {
+			line = strings.TrimPrefix(line, "[ytdl_hook] ")
+			line = strings.TrimPrefix(line, "ERROR: ")
+			return line
+		}
+	}
+	// Fallback: return the first non-empty line.
+	for _, line := range strings.Split(s, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			return line
+		}
+	}
+	return ""
 }
 
 // connectIPC connects to the mpv IPC socket with retries.

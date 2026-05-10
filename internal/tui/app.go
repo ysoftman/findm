@@ -247,6 +247,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, tickCmd()
 		}
+		// Player stopped — surface any latched error from mpv.
+		if errMsg := m.player.ConsumeError(); errMsg != "" {
+			m.errorMsg = errMsg
+			m.statusMsg = ""
+		}
 		// Track ended: auto-play next in playlist
 		if m.autoPlay && m.currentPlaylist != nil {
 			next := m.playingTrackIdx + 1
