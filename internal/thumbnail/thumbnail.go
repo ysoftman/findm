@@ -50,11 +50,11 @@ func Render(img image.Image, cols int) string {
 // foreground color, the lower one as the background color.
 func renderBlocks(img image.Image, cols, rows int) string {
 	var sb strings.Builder
-	for r := 0; r < rows; r++ {
+	for r := range rows {
 		if r > 0 {
 			sb.WriteByte('\n')
 		}
-		for c := 0; c < cols; c++ {
+		for c := range cols {
 			tr, tg, tb := avg(img, c, r*2, cols, rows*2)
 			br, bg, bb := avg(img, c, r*2+1, cols, rows*2)
 			fmt.Fprintf(&sb, "\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm▀", tr, tg, tb, br, bg, bb)

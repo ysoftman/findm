@@ -56,10 +56,7 @@ func renderPlayerBar(p *player.Player, width, frame int) string {
 	vol := p.GetVolume()
 
 	// Truncate title based on available display columns (wide-char aware).
-	maxTitle := width - 50
-	if maxTitle < 15 {
-		maxTitle = 15
-	}
+	maxTitle := max(width-50, 15)
 	title = runewidth.Truncate(title, maxTitle, "...")
 
 	status := animatedStateString(p.GetState(), frame)
@@ -100,7 +97,7 @@ func renderVisualizer(viz *visualizer.Visualizer, width int) string {
 		}
 		sb.WriteString(prefix)
 
-		for bar := 0; bar < barCount; bar++ {
+		for bar := range barCount {
 			barWidth := visualizerBarWidth
 
 			value := interpolatedVisualizerValue(values, bar, barCount)
@@ -126,13 +123,7 @@ func visualizerBarCount(valueCount, width int) int {
 		return 0
 	}
 
-	count := (width + visualizerBarSpacing) / (visualizerBarWidth + visualizerBarSpacing)
-	if count < 1 {
-		count = 1
-	}
-	if count > valueCount {
-		count = valueCount
-	}
+	count := min(max((width+visualizerBarSpacing)/(visualizerBarWidth+visualizerBarSpacing), 1), valueCount)
 	return count
 }
 
@@ -164,10 +155,7 @@ func visualizerRowChar(value float64, row int) string {
 	}
 	if value > rowBottom {
 		fill := (value - rowBottom) / (rowTop - rowBottom)
-		idx := int(math.Ceil(fill*float64(len(visualizerBlocks)))) - 1
-		if idx < 0 {
-			idx = 0
-		}
+		idx := max(int(math.Ceil(fill*float64(len(visualizerBlocks))))-1, 0)
 		if idx >= len(visualizerBlocks) {
 			idx = len(visualizerBlocks) - 1
 		}
@@ -178,10 +166,7 @@ func visualizerRowChar(value float64, row int) string {
 }
 
 func renderVisualizerCell(ch string, row int) string {
-	styleIdx := row - 1
-	if styleIdx < 0 {
-		styleIdx = 0
-	}
+	styleIdx := max(row-1, 0)
 	if styleIdx >= len(vizRowStyles) {
 		styleIdx = len(vizRowStyles) - 1
 	}
@@ -189,13 +174,7 @@ func renderVisualizerCell(ch string, row int) string {
 }
 
 func renderProgressBar(pos, dur float64, width int) string {
-	barWidth := width / 5
-	if barWidth < 8 {
-		barWidth = 8
-	}
-	if barWidth > 30 {
-		barWidth = 30
-	}
+	barWidth := min(max(width/5, 8), 30)
 
 	filled := 0
 	if dur > 0 {

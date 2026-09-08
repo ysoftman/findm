@@ -45,8 +45,8 @@ func IsYouTubeWatchURL(s string) bool {
 		return strings.TrimPrefix(u.Path, "/") != ""
 	}
 	if strings.HasPrefix(u.Path, "/watch") || u.Path == "/shorts" || strings.HasPrefix(u.Path, "/shorts/") {
-		if strings.HasPrefix(u.Path, "/shorts/") {
-			return strings.TrimPrefix(u.Path, "/shorts/") != ""
+		if after, ok := strings.CutPrefix(u.Path, "/shorts/"); ok {
+			return after != ""
 		}
 		return u.Query().Get("v") != ""
 	}

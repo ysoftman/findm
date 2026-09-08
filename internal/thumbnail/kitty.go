@@ -67,12 +67,12 @@ func renderKitty(img image.Image, cols, rows int, tmux bool) string {
 		}
 		sb.WriteString(chunk)
 	}
-	for r := 0; r < rows; r++ {
+	for r := range rows {
 		if r > 0 {
 			sb.WriteByte('\n')
 		}
 		sb.WriteString("\x1b[38;5;1m")
-		for c := 0; c < cols; c++ {
+		for c := range cols {
 			sb.WriteRune('\U0010EEEE')
 			sb.WriteRune(diacritics[r])
 			sb.WriteRune(diacritics[c])

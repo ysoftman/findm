@@ -20,7 +20,7 @@ func splitKitty(t *testing.T, out string) (chunks []string, grid string) {
 	if gi < 0 {
 		t.Fatalf("no placeholder grid in %q", out)
 	}
-	for _, c := range strings.Split(out[:gi], "\x1b\\") {
+	for c := range strings.SplitSeq(out[:gi], "\x1b\\") {
 		if c != "" {
 			chunks = append(chunks, c)
 		}
@@ -109,7 +109,7 @@ func TestRenderKittyTmux(t *testing.T) {
 	}
 	gi := strings.Index(out, gridStart)
 	var unwrapped strings.Builder
-	for _, w := range strings.Split(out[:gi], "\x1bPtmux;") {
+	for w := range strings.SplitSeq(out[:gi], "\x1bPtmux;") {
 		if w != "" {
 			unwrapped.WriteString(strings.ReplaceAll(strings.TrimSuffix(w, "\x1b\\"), "\x1b\x1b", "\x1b"))
 		}

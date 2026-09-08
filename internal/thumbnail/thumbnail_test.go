@@ -10,7 +10,7 @@ import (
 // testImage is 4x2: top row red, bottom row blue.
 func testImage() *image.RGBA {
 	img := image.NewRGBA(image.Rect(0, 0, 4, 2))
-	for x := 0; x < 4; x++ {
+	for x := range 4 {
 		img.Set(x, 0, color.RGBA{255, 0, 0, 255})
 		img.Set(x, 1, color.RGBA{0, 0, 255, 255})
 	}

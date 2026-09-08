@@ -892,10 +892,7 @@ func (m Model) View() string {
 		} else {
 			helpBlock := helpStyle.Render("\nj/k: move  Enter: select  c: create new  Esc: cancel") + "\n"
 			playerBlock := "\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n"
-			availableHeight := m.height - 2 - renderedLineCount(helpBlock) - renderedLineCount(playerBlock)
-			if availableHeight < 1 {
-				availableHeight = 1
-			}
+			availableHeight := max(m.height-2-renderedLineCount(helpBlock)-renderedLineCount(playerBlock), 1)
 			visibleCount := fittedVisibleCount(len(m.playlists), m.addPlaylistCursor, availableHeight, func(start, end int) int {
 				lines := end - start
 				if start > 0 {
@@ -962,15 +959,12 @@ func (m Model) View() string {
 	}
 	helpBlock := helpStyle.Render(helpText(m.view)) + "\n"
 
-	availableHeight := m.height -
-		2 -
-		renderedLineCount(statusBlock) -
-		renderedLineCount(playerBlock) -
-		renderedLineCount(visualizerBlock) -
-		renderedLineCount(helpBlock)
-	if availableHeight < 1 {
-		availableHeight = 1
-	}
+	availableHeight := max(m.height-
+		2-
+		renderedLineCount(statusBlock)-
+		renderedLineCount(playerBlock)-
+		renderedLineCount(visualizerBlock)-
+		renderedLineCount(helpBlock), 1)
 
 	// Main content
 	var content string

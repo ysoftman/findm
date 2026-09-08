@@ -137,7 +137,7 @@ func (p *Player) Play(url, title string) error {
 
 // extractMpvError pulls the most informative line out of mpv's stderr.
 func extractMpvError(s string) string {
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -150,7 +150,7 @@ func extractMpvError(s string) string {
 		}
 	}
 	// Fallback: return the first non-empty line.
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		if line = strings.TrimSpace(line); line != "" {
 			return line
 		}
