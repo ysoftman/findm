@@ -26,3 +26,17 @@ func TestRenderResultsHidesLoadMoreItem(t *testing.T) {
 		t.Fatalf("renderResults() unexpectedly included load more item:\n%s", output)
 	}
 }
+
+func TestCurrentVideoID(t *testing.T) {
+	m := Model{view: ResultsView, cursor: 1, results: []youtube.Video{
+		{ID: "vid1", Kind: youtube.KindVideo},
+		{ID: "pl1", Kind: youtube.KindPlaylist},
+	}}
+	if got := m.currentVideoID(); got != "" {
+		t.Fatalf("currentVideoID() on playlist = %q, want empty", got)
+	}
+	m.cursor = 0
+	if got := m.currentVideoID(); got != "vid1" {
+		t.Fatalf("currentVideoID() = %q, want vid1", got)
+	}
+}

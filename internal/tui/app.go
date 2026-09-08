@@ -8,8 +8,10 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/ysoftman/findm/internal/player"
 	"github.com/ysoftman/findm/internal/playlist"
+	"github.com/ysoftman/findm/internal/thumbnail"
 	"github.com/ysoftman/findm/internal/visualizer"
 	"github.com/ysoftman/findm/internal/youtube"
 )
@@ -26,6 +28,21 @@ func vizTickCmd() tea.Cmd {
 	return tea.Tick(80*time.Millisecond, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
+}
+
+// thumbCols is the terminal column width of the rendered thumbnail.
+const thumbCols = 36
+
+type thumbMsg struct{ id, art string }
+
+func fetchThumbCmd(id string) tea.Cmd {
+	return func() tea.Msg {
+		img, err := thumbnail.Fetch(id)
+		if err != nil {
+			return thumbMsg{id: id}
+		}
+		return thumbMsg{id: id, art: thumbnail.Render(img, thumbCols)}
+	}
 }
 
 // handlePlayerErr handles player errors, ignoring ErrNotReady (the player bar
@@ -92,6 +109,7 @@ type Model struct {
 	searchQuery    string
 	cursor         int
 	hasMoreResults bool
+	thumbs         map[string]string // video ID -> rendered ANSI ("" = pending or failed)
 
 	// Playlist state
 	playlists       []string
@@ -135,6 +153,7 @@ func NewModel(client *youtube.Client, version string) Model {
 		view:             SearchView,
 		searchInput:      si,
 		newPlaylistInput: pi,
+		thumbs:           make(map[string]string),
 	}
 }
 
@@ -148,11 +167,32 @@ func (m Model) Init() tea.Cmd {
 	return textinput.Blink
 }
 
+// Update runs the regular update and then fetches the thumbnail of the video
+// under the cursor if it has not been requested yet.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.update(msg)
+	nm, ok := next.(Model)
+	if !ok {
+		return next, cmd
+	}
+	if id := nm.currentVideoID(); id != "" {
+		if _, seen := nm.thumbs[id]; !seen {
+			nm.thumbs[id] = ""
+			return nm, tea.Batch(cmd, fetchThumbCmd(id))
+		}
+	}
+	return nm, cmd
+}
+
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		return m, nil
+
+	case thumbMsg:
+		m.thumbs[msg.id] = msg.art
 		return m, nil
 
 	case searchMsg:
@@ -421,6 +461,22 @@ func (m Model) resultCursorMax() int {
 		return 0
 	}
 	return len(m.results) - 1
+}
+
+// currentVideoID returns the ID of the video under the cursor, or "" if the
+// cursor is not on a video.
+func (m Model) currentVideoID() string {
+	switch m.view {
+	case ResultsView:
+		if m.cursor < len(m.results) && m.results[m.cursor].Kind == youtube.KindVideo {
+			return m.results[m.cursor].ID
+		}
+	case PlaylistDetailView:
+		if m.currentPlaylist != nil && m.trackCursor < len(m.currentPlaylist.Tracks) {
+			return m.currentPlaylist.Tracks[m.trackCursor].VideoID
+		}
+	}
+	return ""
 }
 
 func (m *Model) loadMoreResults() tea.Cmd {
@@ -906,7 +962,12 @@ func (m Model) View() string {
 			content = renderPlaylistDetail(m.currentPlaylist, m.trackCursor, availableHeight)
 		}
 	}
-	sb.WriteString(strings.TrimRight(content, "\n"))
+	content = strings.TrimRight(content, "\n")
+	if art := m.thumbs[m.currentVideoID()]; art != "" && m.width >= 90 && availableHeight >= lipgloss.Height(art) {
+		content = lipgloss.JoinHorizontal(lipgloss.Top,
+			lipgloss.NewStyle().MaxWidth(m.width-thumbCols-2).Render(content), "  ", art)
+	}
+	sb.WriteString(content)
 
 	sb.WriteString(statusBlock)
 	sb.WriteString(playerBlock)
