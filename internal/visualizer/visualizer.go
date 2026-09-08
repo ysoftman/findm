@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"math/rand/v2"
 	"os"
 	"os/exec"
 	"runtime"
@@ -31,7 +30,8 @@ const (
 	maxStep   = 100 * time.Millisecond
 )
 
-// Visualizer generates an animated audio visualization effect.
+// Visualizer streams bar heights from cava (raw output mode). Without cava it
+// stays off and renders nothing.
 type Visualizer struct {
 	mu         sync.Mutex
 	values     []float64
@@ -52,7 +52,7 @@ func New() *Visualizer {
 	}
 }
 
-// Start begins the visualization animation.
+// Start launches cava; it is a no-op when cava is unavailable.
 func (v *Visualizer) Start() {
 	v.mu.Lock()
 	if v.running {
@@ -66,10 +66,9 @@ func (v *Visualizer) Start() {
 	stopCh := v.stopCh
 	v.mu.Unlock()
 
-	if v.startLiveInput(stopCh) {
-		return
+	if !v.startLiveInput(stopCh) {
+		v.Stop()
 	}
-	go v.animate(stopCh)
 }
 
 // Stop stops the visualization.
@@ -282,16 +281,17 @@ func (v *Visualizer) waitLiveInput(cmd *exec.Cmd, configPath string, stopCh chan
 	_ = cmd.Wait()
 	_ = os.Remove(configPath)
 
+	// Only tear down if this cava is still the active one; a Stop/Start may
+	// have replaced it in the meantime. The TUI restarts us on its next tick.
 	v.mu.Lock()
-	shouldFallback := v.running && v.stopCh == stopCh && v.cmd == cmd
-	if shouldFallback {
+	defer v.mu.Unlock()
+	if v.running && v.stopCh == stopCh && v.cmd == cmd {
+		v.running = false
+		v.stopCh = nil
 		v.cmd = nil
 		v.configPath = ""
-	}
-	v.mu.Unlock()
-
-	if shouldFallback {
-		go v.animate(stopCh)
+		close(stopCh)
+		v.resetLocked()
 	}
 }
 
@@ -351,54 +351,4 @@ func resampledFrameValue(frame []float64, idx, total int) float64 {
 
 	blend := position - float64(left)
 	return frame[left]*(1-blend) + frame[right]*blend
-}
-
-// animate is the fallback when cava is unavailable: drifting waves plus random
-// pulses that fade out, all continuous in time so nothing steps or jitters.
-func (v *Visualizer) animate(stopCh chan struct{}) {
-	ticker := time.NewTicker(16 * time.Millisecond)
-	defer ticker.Stop()
-
-	pulses := make([]float64, bars)
-	start := time.Now()
-	nextPulse := start
-
-	for {
-		select {
-		case <-stopCh:
-			return
-
-		case now := <-ticker.C:
-			t := now.Sub(start).Seconds()
-
-			if !now.Before(nextPulse) {
-				center := rand.IntN(bars)
-				spread := 2 + rand.IntN(4)
-				strength := 0.4 + rand.Float64()*0.5
-				for i := center - spread; i <= center+spread; i++ {
-					if i >= 0 && i < bars {
-						falloff := 1 - math.Abs(float64(i-center))/float64(spread+1)
-						pulses[i] = math.Max(pulses[i], strength*falloff)
-					}
-				}
-				nextPulse = now.Add(time.Duration(150+rand.IntN(350)) * time.Millisecond)
-			}
-
-			energy := 0.55 + 0.25*math.Sin(t*0.9) + 0.1*math.Sin(t*2.3)
-
-			v.mu.Lock()
-			for i := range v.targets {
-				fi := float64(i)
-				base := 0.28 * (1 + math.Sin(fi*0.4+t*4.0))
-				base += 0.18 * (1 + math.Sin(fi*1.1-t*2.2))
-				base += 0.14 * (1 + math.Cos(fi*0.7+t*3.0))
-				if i < bars/4 {
-					base *= 1.2
-				}
-				v.targets[i] = math.Min(math.Max(base*energy+pulses[i], 0.02), 1)
-				pulses[i] *= 0.93
-			}
-			v.mu.Unlock()
-		}
-	}
 }
