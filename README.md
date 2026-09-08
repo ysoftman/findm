@@ -2,13 +2,13 @@
 
 ![findm](findm.png)
 
-YouTube 기반 터미널 음악 검색 및 재생 도구.
+A terminal music search and playback tool built on YouTube.
 
-터미널에서 음악을 검색하고, 추천받고, 바로 재생할 수 있는 TUI 인터페이스를 제공합니다.
+It provides a TUI for searching music, getting recommendations, and playing tracks right from the terminal.
 
-## 사전 요구 사항
+## Prerequisites
 
-### mpv 설치
+### Install mpv
 
 ```bash
 # macOS
@@ -21,67 +21,66 @@ sudo apt install mpv
 sudo pacman -S mpv
 ```
 
-### yt-dlp 설치
+### Install yt-dlp
 
 ```bash
 # macOS
 brew install yt-dlp
 
-# pip (모든 플랫폼)
+# pip (all platforms)
 pip install yt-dlp
 ```
 
-### deno 설치
+### Install deno
 
-YouTube가 최근 영상 정보 추출 시 JavaScript 실행을 요구하는 흐름을 늘렸기 때문에,
-JS 런타임이 없으면 일부 영상(특히 Shorts와 최신 업로드)이 `This video is not available`로 떨어질 수 있습니다.
-yt-dlp는 기본으로 `deno`를 인식하므로 설치만 해두면 됩니다.
+YouTube increasingly requires JavaScript execution when extracting video info,
+so without a JS runtime some videos (especially Shorts and recent uploads) may fail with `This video is not available`.
+yt-dlp detects `deno` automatically, so installing it is enough.
 
 ```bash
 # macOS
 brew install deno
 ```
 
-참고: <https://github.com/yt-dlp/yt-dlp/wiki/EJS>
+See: <https://github.com/yt-dlp/yt-dlp/wiki/EJS>
 
-## 설치
+## Installation
 
 ```bash
 go install github.com/ysoftman/findm@latest
 ```
 
-소스에서 빌드:
+Build from source:
 
 ```bash
 go build -o findm .
 ```
 
-버전을 지정하지 않으면 타이틀에 `dev`로 표시됩니다.
-GitHub에서 태그를 push하면 GitHub Actions가 해당 태그명으로 자동 빌드하여 Release에 바이너리를 첨부합니다.
+If no version is set, the title shows `dev`.
+Pushing a tag to GitHub triggers GitHub Actions to build with that tag name and attach the binaries to the Release.
 
-## 실행
+## Usage
 
 ```bash
 ./findm
 ```
 
-## 썸네일
+## Thumbnails
 
-검색 결과와 플레이리스트 상세에서 커서 위 영상의 썸네일을 목록 오른쪽에 표시합니다(터미널 폭 90열 이상).
-`https://i.ytimg.com/vi/<ID>/mqdefault.jpg`를 직접 받아오며 yt-dlp 호출은 없습니다.
+In search results and playlist detail, the thumbnail of the video under the cursor is shown to the right of the list (terminal width of 90 columns or more).
+It is fetched directly from `https://i.ytimg.com/vi/<ID>/mqdefault.jpg` without calling yt-dlp.
 
-Kitty graphics protocol을 지원하는 터미널(Ghostty, kitty)은 자동 감지해 고해상도로 그리고,
-그 외에는 하프블록(▀) truecolor 문자로 그립니다.
-`FINDM_THUMB=kitty` 또는 `FINDM_THUMB=blocks`로 강제 지정할 수 있습니다.
+Terminals that support the Kitty graphics protocol (Ghostty, kitty) are detected automatically and get a high-resolution image;
+everywhere else it is drawn with half-block (▀) truecolor characters.
+Set `FINDM_THUMB=kitty` or `FINDM_THUMB=blocks` to force a mode.
 
-tmux 안에서 Kitty 모드를 쓰려면 tmux 3.3+ 에서 `set -g allow-passthrough on` 설정이 필요합니다.
+To use Kitty mode inside tmux, tmux 3.3+ with `set -g allow-passthrough on` is required.
 
-## 데이터 저장 경로
+## Data Locations
 
-| 파일 | 경로 | 설명 |
-|------|------|------|
-| 설정 파일 | `~/.config/findm/config.json` | API 키 등 설정 (선택, yt-dlp 사용 시 불필요) |
-| 플레이리스트 | `~/.config/findm/playlists/*.json` | 저장된 플레이리스트 목록 |
+| File | Path | Description |
+|------|------|-------------|
+| Config file | `~/.config/findm/config.json` | Settings such as API keys (optional, not needed with yt-dlp) |
+| Playlists | `~/.config/findm/playlists/*.json` | Saved playlists |
 
-설정 디렉토리는 `$XDG_CONFIG_HOME/findm/`을 따르며,
-미설정 시 `~/.config/findm/`이 기본값입니다.
+The config directory follows `$XDG_CONFIG_HOME/findm/` and defaults to `~/.config/findm/` when unset.
