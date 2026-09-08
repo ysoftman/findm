@@ -21,6 +21,14 @@ const (
 	liveInputBinary  = "cava"
 	liveInputMethod  = "FINDM_VISUALIZER_METHOD"
 	liveInputSource  = "FINDM_VISUALIZER_SOURCE"
+
+	// Smoothing time constants used by Values(). cava already filters its output
+	// (noise_reduction), so these stay tiny: just enough to hide the phase
+	// mismatch between cava's 60 fps frames and our redraw tick without
+	// adding visible lag.
+	attackTau = 8 * time.Millisecond
+	decayTau  = 30 * time.Millisecond
+	maxStep   = 100 * time.Millisecond
 )
 
 // Visualizer generates an animated audio visualization effect.
@@ -28,6 +36,7 @@ type Visualizer struct {
 	mu         sync.Mutex
 	values     []float64
 	targets    []float64
+	lastStep   time.Time
 	running    bool
 	stopCh     chan struct{}
 	cmd        *exec.Cmd
@@ -37,8 +46,9 @@ type Visualizer struct {
 // New creates a new Visualizer instance.
 func New() *Visualizer {
 	return &Visualizer{
-		values:  make([]float64, bars),
-		targets: make([]float64, bars),
+		values:   make([]float64, bars),
+		targets:  make([]float64, bars),
+		lastStep: time.Now(),
 	}
 }
 
@@ -99,13 +109,41 @@ func (v *Visualizer) IsRunning() bool {
 	return v.running
 }
 
-// Values returns a copy of the current bar values (0.0 - 1.0).
+// Values advances the bars toward their targets by the wall time elapsed since
+// the previous call and returns a copy (0.0 - 1.0). Smoothing lives here, on
+// the render side, so motion stays fluid regardless of how the input frame
+// rate and the redraw tick line up.
 func (v *Visualizer) Values() []float64 {
 	v.mu.Lock()
 	defer v.mu.Unlock()
+
+	now := time.Now()
+	v.stepLocked(now.Sub(v.lastStep))
+	v.lastStep = now
+
 	out := make([]float64, len(v.values))
 	copy(out, v.values)
 	return out
+}
+
+func (v *Visualizer) stepLocked(dt time.Duration) {
+	if dt <= 0 {
+		return
+	}
+	if dt > maxStep {
+		dt = maxStep
+	}
+	rise := 1 - math.Exp(-float64(dt)/float64(attackTau))
+	fall := 1 - math.Exp(-float64(dt)/float64(decayTau))
+
+	for i, target := range v.targets {
+		current := v.values[i]
+		if target > current {
+			v.values[i] = current + (target-current)*rise
+		} else {
+			v.values[i] = current + (target-current)*fall
+		}
+	}
 }
 
 func (v *Visualizer) resetLocked() {
@@ -113,6 +151,7 @@ func (v *Visualizer) resetLocked() {
 		v.values[i] = 0
 		v.targets[i] = 0
 	}
+	v.lastStep = time.Now()
 }
 
 func (v *Visualizer) startLiveInput(stopCh chan struct{}) bool {
@@ -209,7 +248,7 @@ frame_delimiter = 10
 [smoothing]
 monstercat = 1
 waves = 1
-noise_reduction = 82
+noise_reduction = 77
 
 [eq]
 1 = 1.20
@@ -282,6 +321,7 @@ func parseRawFrame(line string) []float64 {
 	return frame
 }
 
+// applyFrame sets the targets from a cava frame; Values() eases toward them.
 func (v *Visualizer) applyFrame(frame []float64) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -289,16 +329,8 @@ func (v *Visualizer) applyFrame(frame []float64) {
 	if !v.running {
 		return
 	}
-
-	for i := range v.values {
-		target := resampledFrameValue(frame, i, len(v.values))
-		current := v.values[i]
-
-		if target > current {
-			v.values[i] = current + (target-current)*0.85
-		} else {
-			v.values[i] = current + (target-current)*0.45
-		}
+	for i := range v.targets {
+		v.targets[i] = resampledFrameValue(frame, i, len(v.targets))
 	}
 }
 
@@ -321,105 +353,52 @@ func resampledFrameValue(frame []float64, idx, total int) float64 {
 	return frame[left]*(1-blend) + frame[right]*blend
 }
 
+// animate is the fallback when cava is unavailable: drifting waves plus random
+// pulses that fade out, all continuous in time so nothing steps or jitters.
 func (v *Visualizer) animate(stopCh chan struct{}) {
-	ticker := time.NewTicker(40 * time.Millisecond)
+	ticker := time.NewTicker(16 * time.Millisecond)
 	defer ticker.Stop()
 
-	beatTick := time.NewTicker(260 * time.Millisecond)
-	defer beatTick.Stop()
-
-	accentTick := time.NewTicker(1200 * time.Millisecond)
-	defer accentTick.Stop()
-
-	frame := 0
-	energy := 0.7
+	pulses := make([]float64, bars)
+	start := time.Now()
+	nextPulse := start
 
 	for {
 		select {
 		case <-stopCh:
 			return
 
-		case <-accentTick.C:
-			energy = 0.5 + rand.Float64()*0.5
+		case now := <-ticker.C:
+			t := now.Sub(start).Seconds()
 
-			v.mu.Lock()
-			center := rand.IntN(bars)
-			spread := 2 + rand.IntN(4)
-			for i := center - spread; i <= center+spread; i++ {
-				if i >= 0 && i < bars {
-					v.targets[i] = 0.8 + rand.Float64()*0.2
+			if !now.Before(nextPulse) {
+				center := rand.IntN(bars)
+				spread := 2 + rand.IntN(4)
+				strength := 0.4 + rand.Float64()*0.5
+				for i := center - spread; i <= center+spread; i++ {
+					if i >= 0 && i < bars {
+						falloff := 1 - math.Abs(float64(i-center))/float64(spread+1)
+						pulses[i] = math.Max(pulses[i], strength*falloff)
+					}
 				}
+				nextPulse = now.Add(time.Duration(150+rand.IntN(350)) * time.Millisecond)
 			}
-			v.mu.Unlock()
 
-		case <-beatTick.C:
-			nextTargets := make([]float64, bars)
+			energy := 0.55 + 0.25*math.Sin(t*0.9) + 0.1*math.Sin(t*2.3)
+
 			v.mu.Lock()
-			for i := range nextTargets {
+			for i := range v.targets {
 				fi := float64(i)
-				ff := float64(frame)
-
-				base := 0.0
-				base += 0.3 * (1 + math.Sin(fi*0.4+ff*0.3))
-				base += 0.2 * (1 + math.Sin(fi*1.1-ff*0.15))
-				base += 0.15 * (1 + math.Cos(fi*0.7+ff*0.22))
-
-				spike := rand.Float64()
-				if spike > 0.6 {
-					base += (spike - 0.6) * 2.5
-				}
+				base := 0.28 * (1 + math.Sin(fi*0.4+t*4.0))
+				base += 0.18 * (1 + math.Sin(fi*1.1-t*2.2))
+				base += 0.14 * (1 + math.Cos(fi*0.7+t*3.0))
 				if i < bars/4 {
 					base *= 1.2
 				}
-
-				base *= energy
-				if base > 1.0 {
-					base = 1.0
-				}
-				if base < 0.02 {
-					base = 0.02
-				}
-				nextTargets[i] = base
-			}
-
-			for i := range v.targets {
-				smoothed := nextTargets[i] * 0.58
-				if i > 0 {
-					smoothed += nextTargets[i-1] * 0.21
-				} else {
-					smoothed += nextTargets[i] * 0.21
-				}
-				if i < len(nextTargets)-1 {
-					smoothed += nextTargets[i+1] * 0.21
-				} else {
-					smoothed += nextTargets[i] * 0.21
-				}
-				v.targets[i] = smoothed
+				v.targets[i] = math.Min(math.Max(base*energy+pulses[i], 0.02), 1)
+				pulses[i] *= 0.93
 			}
 			v.mu.Unlock()
-
-		case <-ticker.C:
-			v.mu.Lock()
-			for i := range v.values {
-				target := v.targets[i]
-				current := v.values[i]
-
-				if target > current {
-					v.values[i] = current + (target-current)*0.45
-				} else {
-					v.values[i] = current + (target-current)*0.16
-				}
-
-				v.values[i] += (rand.Float64() - 0.5) * 0.025
-				if v.values[i] > 1.0 {
-					v.values[i] = 1.0
-				}
-				if v.values[i] < 0.0 {
-					v.values[i] = 0.0
-				}
-			}
-			v.mu.Unlock()
-			frame++
 		}
 	}
 }

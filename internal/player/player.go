@@ -37,7 +37,17 @@ type Player struct {
 	conn       net.Conn
 	reader     *bufio.Reader
 	lastErr    string // last fatal error from mpv (consumed once)
+	props      map[string]cachedProp
 }
+
+type cachedProp struct {
+	data json.RawMessage
+	at   time.Time
+}
+
+// propCacheTTL bounds how often the UI's 60 fps redraw hits mpv's IPC socket for
+// display-only properties. Any non-get command invalidates the cache.
+const propCacheTTL = 250 * time.Millisecond
 
 // ConsumeError returns and clears the most recent fatal mpv error, if any.
 func (p *Player) ConsumeError() string {
@@ -264,6 +274,9 @@ func (p *Player) IsReady() bool {
 
 // sendCommand sends a JSON command to mpv via IPC and returns the response data.
 func (p *Player) sendCommand(args ...any) (json.RawMessage, error) {
+	if len(args) == 0 || args[0] != "get_property" {
+		p.props = nil
+	}
 	if p.conn == nil || p.reader == nil {
 		return nil, ErrNotReady
 	}
@@ -320,7 +333,18 @@ func (p *Player) sendCommand(args ...any) (json.RawMessage, error) {
 
 // getProperty retrieves a property value from mpv.
 func (p *Player) getProperty(name string) (json.RawMessage, error) {
-	return p.sendCommand("get_property", name)
+	if c, ok := p.props[name]; ok && time.Since(c.at) < propCacheTTL {
+		return c.data, nil
+	}
+	data, err := p.sendCommand("get_property", name)
+	if err != nil {
+		return nil, err
+	}
+	if p.props == nil {
+		p.props = make(map[string]cachedProp)
+	}
+	p.props[name] = cachedProp{data: data, at: time.Now()}
+	return data, nil
 }
 
 // TogglePause toggles between Playing and Paused states.

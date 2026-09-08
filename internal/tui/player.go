@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/mattn/go-runewidth"
 	"github.com/ysoftman/findm/internal/player"
@@ -25,8 +26,8 @@ const (
 var visualizerBlocks = []rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
 
 func animatedStateString(state player.State, frame int) string {
-	// Slow down icon animation (~1s per step at 100ms tick)
-	slow := frame / 10
+	// Slow down icon animation to ~1s per step at the visualizer tick rate
+	slow := frame / int(time.Second/vizTickInterval)
 	switch state {
 	case player.Preparing:
 		return preparingIcons[slow%len(preparingIcons)]

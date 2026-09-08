@@ -5,6 +5,7 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseRawFrame(t *testing.T) {
@@ -40,11 +41,36 @@ func TestLiveInputConfig(t *testing.T) {
 		"method = raw",
 		"data_format = ascii",
 		fmt.Sprintf("ascii_max_range = %d", rawFrameMaxRange),
-		"noise_reduction = 82",
+		"noise_reduction = 77",
 	}
 	for _, part := range wantParts {
 		if !strings.Contains(config, part) {
 			t.Fatalf("liveInputConfig() missing %q", part)
 		}
+	}
+}
+
+func TestStepLockedEasesTowardTargets(t *testing.T) {
+	v := New()
+	v.targets[0] = 1
+	v.values[1] = 1 // target 0: falls
+
+	v.stepLocked(16 * time.Millisecond)
+	rise, fall := v.values[0], v.values[1]
+	if rise <= 0 || rise >= 1 {
+		t.Fatalf("rising bar = %f, want strictly between 0 and 1", rise)
+	}
+	if fall <= 0 || fall >= 1 {
+		t.Fatalf("falling bar = %f, want strictly between 0 and 1", fall)
+	}
+	if 1-fall >= rise {
+		t.Fatalf("fall moved %f but rise moved %f; attack should be faster than decay", 1-fall, rise)
+	}
+
+	for range 200 {
+		v.stepLocked(16 * time.Millisecond)
+	}
+	if math.Abs(v.values[0]-1) > 0.001 || v.values[1] > 0.001 {
+		t.Fatalf("values after settling = %v, want [1 0 ...]", v.values[:2])
 	}
 }

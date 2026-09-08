@@ -24,8 +24,11 @@ func tickCmd() tea.Cmd {
 	})
 }
 
+// vizTickInterval matches cava's default 60 fps so bars redraw as new frames arrive.
+const vizTickInterval = 16 * time.Millisecond
+
 func vizTickCmd() tea.Cmd {
-	return tea.Tick(80*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(vizTickInterval, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }
