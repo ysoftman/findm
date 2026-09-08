@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +15,14 @@ import (
 )
 
 func main() {
+	showVersion := flag.Bool("version", false, "print version and exit")
+	flag.BoolVar(showVersion, "v", false, "print version and exit")
+	flag.Parse()
+	if *showVersion {
+		fmt.Println("findm", Version)
+		return
+	}
+
 	// Check mpv availability
 	if !player.IsAvailable() {
 		fmt.Fprintln(os.Stderr, "Warning: mpv is not installed. Playback will not work.")

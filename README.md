@@ -56,7 +56,7 @@ Build from source:
 go build -o findm .
 ```
 
-If no version is set, the title shows `dev`.
+`findm --version` (or `-v`) prints the version. It comes from the `-X main.Version=...` ldflag, or from the module version when installed with `go install ...@vX.Y.Z`, otherwise `dev`.
 Pushing a tag to GitHub triggers GitHub Actions to build with that tag name and attach the binaries to the Release.
 
 ## Usage
