@@ -13,7 +13,8 @@ func renderPlaylistList(names []string, cursor int, height int) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(titleStyle.Render("Playlists") + "\n\n")
+	sb.WriteString(titleStyle.Render("Playlists"))
+	sb.WriteString("\n\n")
 
 	visibleCount := fittedVisibleCount(len(names), cursor, height, func(start, end int) int {
 		lines := 2 + end - start
@@ -28,7 +29,8 @@ func renderPlaylistList(names []string, cursor int, height int) string {
 	start, end := viewportBounds(len(names), cursor, visibleCount)
 
 	if start > 0 {
-		sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↑ %d more", start)) + "\n")
+		sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↑ %d more", start)))
+		sb.WriteByte('\n')
 	}
 
 	for i := start; i < end; i++ {
@@ -39,11 +41,13 @@ func renderPlaylistList(names []string, cursor int, height int) string {
 			prefix = "▸ "
 			style = selectedItemStyle
 		}
-		sb.WriteString(style.Render(fmt.Sprintf("%s%s", prefix, name)) + "\n")
+		sb.WriteString(style.Render(fmt.Sprintf("%s%s", prefix, name)))
+		sb.WriteByte('\n')
 	}
 
 	if end < len(names) {
-		sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↓ %d more", len(names)-end)) + "\n")
+		sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↓ %d more", len(names)-end)))
+		sb.WriteByte('\n')
 	}
 
 	return sb.String()
@@ -61,10 +65,12 @@ func trackURL(t playlist.Track) string {
 
 func renderPlaylistDetail(pl *playlist.Playlist, cursor int, height int) string {
 	var sb strings.Builder
-	sb.WriteString(titleStyle.Render(fmt.Sprintf("Playlist: %s", pl.Name)) + "\n\n")
+	sb.WriteString(titleStyle.Render(fmt.Sprintf("Playlist: %s", pl.Name)))
+	sb.WriteString("\n\n")
 
 	if len(pl.Tracks) == 0 {
-		sb.WriteString(normalItemStyle.Render("Empty playlist.") + "\n")
+		sb.WriteString(normalItemStyle.Render("Empty playlist."))
+		sb.WriteByte('\n')
 		return sb.String()
 	}
 
@@ -81,7 +87,8 @@ func renderPlaylistDetail(pl *playlist.Playlist, cursor int, height int) string 
 	start, end := viewportBounds(len(pl.Tracks), cursor, visibleCount)
 
 	if start > 0 {
-		sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↑ %d more", start)) + "\n")
+		sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↑ %d more", start)))
+		sb.WriteByte('\n')
 	}
 
 	for i := start; i < end; i++ {
@@ -95,13 +102,17 @@ func renderPlaylistDetail(pl *playlist.Playlist, cursor int, height int) string 
 		title := style.Render(fmt.Sprintf("%s%s", prefix, t.Title))
 		info := fmt.Sprintf("    %s", channelStyle.Render(t.Channel))
 		url := "    " + urlStyle.Render(trackURL(t))
-		sb.WriteString(title + "\n")
-		sb.WriteString(info + "\n")
-		sb.WriteString(url + "\n")
+		sb.WriteString(title)
+		sb.WriteByte('\n')
+		sb.WriteString(info)
+		sb.WriteByte('\n')
+		sb.WriteString(url)
+		sb.WriteByte('\n')
 	}
 
 	if end < len(pl.Tracks) {
-		sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↓ %d more", len(pl.Tracks)-end)) + "\n")
+		sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↓ %d more", len(pl.Tracks)-end)))
+		sb.WriteByte('\n')
 	}
 
 	return sb.String()

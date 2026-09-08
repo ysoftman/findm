@@ -862,20 +862,33 @@ func (m Model) View() string {
 		playlistTab = activeTabStyle.Render("Playlists")
 	}
 	title := titleStyle.Render(fmt.Sprintf("♪ findm - Music Finder (%s)", m.version))
-	sb.WriteString(title + "  " + searchTab + " " + playlistTab + "\n\n")
+	sb.WriteString(title)
+	sb.WriteString("  ")
+	sb.WriteString(searchTab)
+	sb.WriteString(" ")
+	sb.WriteString(playlistTab)
+	sb.WriteString("\n\n")
 
 	// Adding to playlist overlay
 	if m.addingToPlaylist {
 		if m.creatingPlaylist {
-			sb.WriteString(titleStyle.Render("New playlist (track will be added automatically):") + "\n\n")
-			sb.WriteString("Name: " + m.newPlaylistInput.View() + "\n")
-			sb.WriteString(helpStyle.Render("Enter: create & add  Esc: back") + "\n")
-			sb.WriteString("\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n")
+			sb.WriteString(titleStyle.Render("New playlist (track will be added automatically):"))
+			sb.WriteString("\n\n")
+			sb.WriteString("Name: ")
+			sb.WriteString(m.newPlaylistInput.View())
+			sb.WriteByte('\n')
+			sb.WriteString(helpStyle.Render("Enter: create & add  Esc: back"))
+			sb.WriteByte('\n')
+			sb.WriteByte('\n')
+			sb.WriteString(renderPlayerBar(m.player, m.width, m.animFrame))
+			sb.WriteByte('\n')
 			return sb.String()
 		}
-		sb.WriteString(titleStyle.Render("Add to playlist:") + "\n\n")
+		sb.WriteString(titleStyle.Render("Add to playlist:"))
+		sb.WriteString("\n\n")
 		if len(m.playlists) == 0 {
-			sb.WriteString(normalItemStyle.Render("No playlists yet. Press 'c' to create one.") + "\n")
+			sb.WriteString(normalItemStyle.Render("No playlists yet. Press 'c' to create one."))
+			sb.WriteByte('\n')
 		} else {
 			helpBlock := helpStyle.Render("\nj/k: move  Enter: select  c: create new  Esc: cancel") + "\n"
 			playerBlock := "\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n"
@@ -895,7 +908,8 @@ func (m Model) View() string {
 			})
 			start, end := viewportBounds(len(m.playlists), m.addPlaylistCursor, visibleCount)
 			if start > 0 {
-				sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↑ %d more", start)) + "\n")
+				sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↑ %d more", start)))
+				sb.WriteByte('\n')
 			}
 			for i := start; i < end; i++ {
 				name := m.playlists[i]
@@ -905,22 +919,32 @@ func (m Model) View() string {
 					prefix = "▸ "
 					style = selectedItemStyle
 				}
-				sb.WriteString(style.Render(fmt.Sprintf("%s%s", prefix, name)) + "\n")
+				sb.WriteString(style.Render(fmt.Sprintf("%s%s", prefix, name)))
+				sb.WriteByte('\n')
 			}
 			if end < len(m.playlists) {
-				sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↓ %d more", len(m.playlists)-end)) + "\n")
+				sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↓ %d more", len(m.playlists)-end)))
+				sb.WriteByte('\n')
 			}
 		}
-		sb.WriteString(helpStyle.Render("\nj/k: move  Enter: select  c: create new  Esc: cancel") + "\n")
-		sb.WriteString("\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n")
+		sb.WriteString(helpStyle.Render("\nj/k: move  Enter: select  c: create new  Esc: cancel"))
+		sb.WriteByte('\n')
+		sb.WriteByte('\n')
+		sb.WriteString(renderPlayerBar(m.player, m.width, m.animFrame))
+		sb.WriteByte('\n')
 		return sb.String()
 	}
 
 	// Creating playlist input
 	if m.creatingPlaylist {
-		sb.WriteString("New playlist name: " + m.newPlaylistInput.View() + "\n")
-		sb.WriteString(helpStyle.Render("Enter: create  Esc: cancel") + "\n")
-		sb.WriteString("\n" + renderPlayerBar(m.player, m.width, m.animFrame) + "\n")
+		sb.WriteString("New playlist name: ")
+		sb.WriteString(m.newPlaylistInput.View())
+		sb.WriteByte('\n')
+		sb.WriteString(helpStyle.Render("Enter: create  Esc: cancel"))
+		sb.WriteByte('\n')
+		sb.WriteByte('\n')
+		sb.WriteString(renderPlayerBar(m.player, m.width, m.animFrame))
+		sb.WriteByte('\n')
 		return sb.String()
 	}
 

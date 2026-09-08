@@ -42,7 +42,8 @@ func renderResults(videos []youtube.Video, cursor int, height int, canLoadMore b
 	var sb strings.Builder
 
 	if start > 0 {
-		sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↑ %d more", start)) + "\n")
+		sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↑ %d more", start)))
+		sb.WriteByte('\n')
 	}
 
 	for i := start; i < end; i++ {
@@ -81,16 +82,20 @@ func renderResults(videos []youtube.Video, cursor int, height int, canLoadMore b
 		}
 		url := "    " + urlStyle.Render(videoURL(v))
 
-		sb.WriteString(title + "\n")
-		sb.WriteString(info + "\n")
-		sb.WriteString(url + "\n")
+		sb.WriteString(title)
+		sb.WriteByte('\n')
+		sb.WriteString(info)
+		sb.WriteByte('\n')
+		sb.WriteString(url)
+		sb.WriteByte('\n')
 		if i < end-1 {
 			sb.WriteString("\n")
 		}
 	}
 
 	if end < totalItems {
-		sb.WriteString("\n" + scrollIndicatorStyle.Render(fmt.Sprintf("  ↓ %d more", totalItems-end)))
+		sb.WriteByte('\n')
+		sb.WriteString(scrollIndicatorStyle.Render(fmt.Sprintf("  ↓ %d more", totalItems-end)))
 	}
 
 	return sb.String()
