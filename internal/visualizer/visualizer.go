@@ -199,7 +199,7 @@ func (v *Visualizer) startLiveInput(stopCh chan struct{}) bool {
 	v.configPath = configPath
 	v.mu.Unlock()
 
-	go v.readLiveInput(stdout, stopCh)
+	go v.readLiveInput(cmd, stdout, stopCh)
 	go v.waitLiveInput(cmd, configPath, stopCh)
 	return true
 }
@@ -258,7 +258,7 @@ noise_reduction = 77
 `, bars, input.String(), rawFrameMaxRange)
 }
 
-func (v *Visualizer) readLiveInput(stdout io.Reader, stopCh chan struct{}) {
+func (v *Visualizer) readLiveInput(cmd *exec.Cmd, stdout io.Reader, stopCh chan struct{}) {
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 0, 4096), 64*1024)
 
@@ -274,6 +274,11 @@ func (v *Visualizer) readLiveInput(stdout io.Reader, stopCh chan struct{}) {
 			continue
 		}
 		v.applyFrame(frame)
+	}
+	if scanner.Err() != nil {
+		// Reader died but cava is still writing: kill it so waitLiveInput tears
+		// down and the TUI restarts us on its next tick instead of freezing.
+		_ = cmd.Process.Kill()
 	}
 }
 

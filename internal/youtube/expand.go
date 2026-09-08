@@ -3,6 +3,7 @@ package youtube
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"os/exec"
@@ -146,7 +147,11 @@ func (c *Client) FetchVideosFromURL(rawURL string, max int) ([]Video, error) {
 		})
 	}
 
-	if err := cmd.Wait(); err != nil {
+	scanErr := scanner.Err()
+	if scanErr != nil {
+		_ = cmd.Process.Kill() // nobody reads the pipe anymore; don't let yt-dlp block on it
+	}
+	if err := errors.Join(cmd.Wait(), scanErr); err != nil {
 		if len(videos) > 0 {
 			return videos, nil
 		}

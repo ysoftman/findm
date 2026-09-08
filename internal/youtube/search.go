@@ -3,6 +3,7 @@ package youtube
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os/exec"
@@ -106,7 +107,11 @@ func (c *Client) Search(query string, maxResults int64, offset int64) ([]Video, 
 		})
 	}
 
-	if err := cmd.Wait(); err != nil {
+	scanErr := scanner.Err()
+	if scanErr != nil {
+		_ = cmd.Process.Kill() // nobody reads the pipe anymore; don't let yt-dlp block on it
+	}
+	if err := errors.Join(cmd.Wait(), scanErr); err != nil {
 		// If we got some results, return them despite exit error
 		if len(videos) > 0 {
 			return applyOffset(videos, offset), nil
