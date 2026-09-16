@@ -71,10 +71,11 @@ In search results and playlist detail, the thumbnail of the video under the curs
 It is fetched directly from `https://i.ytimg.com/vi/<ID>/mqdefault.jpg` without calling yt-dlp.
 
 Terminals that support the Kitty graphics protocol (Ghostty, kitty) are detected automatically and get a high-resolution image;
-everywhere else it is drawn with half-block (▀) truecolor characters.
+everywhere else it is drawn with sextant (2x3 block, Symbols for Legacy Computing U+1FB00) truecolor characters, which Ghostty, kitty, WezTerm and foot render built-in.
 Set `FINDM_THUMB=kitty` or `FINDM_THUMB=blocks` to force a mode.
 
 To use Kitty mode inside tmux, tmux 3.3+ with `set -g allow-passthrough on` is required.
+Inside zellij (0.45+, `support_kitty_graphics_protocol` left at its default) the Kitty image is placed directly at the cursor instead of through Unicode placeholders, which zellij does not support; set `FINDM_THUMB=blocks` if the image misbehaves.
 
 ## Data Locations
 

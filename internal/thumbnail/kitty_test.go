@@ -50,7 +50,7 @@ func decodeChunks(t *testing.T, chunks []string) image.Image {
 }
 
 func TestRenderKitty(t *testing.T) {
-	out := renderKitty(testImage(), 4, 1, false)
+	out := renderKitty(testImage(), 4, 1, false, false)
 	if !strings.HasPrefix(out, "\x1b_Ga=T,U=1,q=2,f=100,t=d,i=1,c=4,r=1,m=0;") {
 		t.Fatalf("unexpected prefix: %q", out[:60])
 	}
@@ -83,7 +83,7 @@ func TestRenderKittyChunks(t *testing.T) {
 	for i := range img.Pix {
 		img.Pix[i] = uint8(rnd.Intn(256))
 	}
-	chunks, _ := splitKitty(t, renderKitty(img, 8, 4, false))
+	chunks, _ := splitKitty(t, renderKitty(img, 8, 4, false, false))
 	if len(chunks) < 2 {
 		t.Fatalf("chunks = %d, want several", len(chunks))
 	}
@@ -102,8 +102,8 @@ func TestRenderKittyChunks(t *testing.T) {
 
 func TestRenderKittyTmux(t *testing.T) {
 	img := testImage()
-	plain := renderKitty(img, 4, 1, false)
-	out := renderKitty(img, 4, 1, true)
+	plain := renderKitty(img, 4, 1, false, false)
+	out := renderKitty(img, 4, 1, true, false)
 	if !strings.HasPrefix(out, "\x1bPtmux;\x1b\x1b_G") {
 		t.Fatalf("unexpected prefix: %q", out[:20])
 	}
@@ -121,8 +121,8 @@ func TestRenderKittyTmux(t *testing.T) {
 
 func TestRenderKittyFallback(t *testing.T) {
 	img := testImage()
-	if got := renderKitty(img, len(diacritics)+1, 1, false); got != renderBlocks(img, len(diacritics)+1, 1) {
-		t.Fatal("oversized grid should fall back to half-blocks")
+	if got := renderKitty(img, len(diacritics)+1, 1, false, false); got != renderBlocks(img, len(diacritics)+1, 1) {
+		t.Fatal("oversized grid should fall back to blocks")
 	}
 }
 
@@ -134,5 +134,38 @@ func TestDetectKitty(t *testing.T) {
 	t.Setenv("FINDM_THUMB", "blocks")
 	if detectKitty() {
 		t.Fatal("FINDM_THUMB=blocks should disable kitty")
+	}
+	t.Setenv("FINDM_THUMB", "")
+	t.Setenv("TERM_PROGRAM", "ghostty")
+	t.Setenv("TMUX", "")
+	if !detectKitty() {
+		t.Fatal("ghostty should enable kitty")
+	}
+	t.Setenv("ZELLIJ", "0")
+	if !detectKitty() || !directPlace() {
+		t.Fatal("zellij on ghostty should enable kitty in direct placement mode")
+	}
+	t.Setenv("ZELLIJ", "")
+	if directPlace() {
+		t.Fatal("direct placement should be off outside zellij")
+	}
+}
+
+func TestRenderKittyDirect(t *testing.T) {
+	// A direct placement anchors at the cursor (C=1) without placeholders and
+	// leaves a blank cols x rows grid for the layout.
+	out := renderKitty(testImage(), 4, 2, false, true)
+	if !strings.HasPrefix(out, "\x1b_Ga=T,C=1,q=2,f=100,t=d,i=1,c=4,r=2,m=0;") {
+		t.Fatalf("unexpected prefix: %q", out[:60])
+	}
+	if strings.Contains(out, "U=1") || strings.Contains(out, "\U0010EEEE") {
+		t.Fatal("direct placement must not use placeholders")
+	}
+	if !strings.HasSuffix(out, "\x1b\\    \n    ") {
+		t.Fatalf("unexpected grid: %q", out[len(out)-20:])
+	}
+	// The oversized-grid fallback only applies to placeholders.
+	if got := renderKitty(testImage(), len(diacritics)+1, 1, false, true); !strings.HasPrefix(got, "\x1b_G") {
+		t.Fatal("direct placement should not fall back to blocks on wide grids")
 	}
 }

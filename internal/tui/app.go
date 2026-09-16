@@ -868,6 +868,9 @@ func (m Model) View() string {
 	sb.WriteString(" ")
 	sb.WriteString(playlistTab)
 	sb.WriteString("\n\n")
+	// The thumbnail, when shown, starts on this line; a zellij redraw of it
+	// must drop the previous image before the new placement further along.
+	sb.WriteString(thumbnail.Clear())
 
 	// Adding to playlist overlay
 	if m.addingToPlaylist {

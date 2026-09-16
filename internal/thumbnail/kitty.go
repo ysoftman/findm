@@ -34,12 +34,42 @@ func detectKitty() bool {
 	return prog == "ghostty" || prog == "kitty" || os.Getenv("KITTY_WINDOW_ID") != ""
 }
 
+// deleteAll removes every image placement (and image data) on the screen.
+const deleteAll = "\x1b_Ga=d,d=A,q=2\x1b\\"
+
+// Clear returns the escape that removes a directly placed thumbnail, or "" when
+// placeholders (which vanish with their cells) or blocks are in use. Callers
+// emit it at the start of the line the thumbnail sits on, ahead of the
+// placement, so any redraw of that line drops the previous image first.
+func Clear() string {
+	if !useKitty() || !directPlace() {
+		return ""
+	}
+	return passthrough(deleteAll, os.Getenv("TMUX") != "")
+}
+
+// directPlace reports whether to place the image at the cursor position
+// instead of through Unicode placeholders. zellij (as of 0.45) forwards the
+// Kitty protocol to the host terminal but leaves placeholder cells blank.
+func directPlace() bool {
+	return os.Getenv("ZELLIJ") != ""
+}
+
+// passthrough wraps a Kitty graphics escape in a tmux DCS passthrough when tmux is true.
+func passthrough(chunk string, tmux bool) string {
+	if !tmux {
+		return chunk
+	}
+	return "\x1bPtmux;" + strings.ReplaceAll(chunk, "\x1b", "\x1b\x1b") + "\x1b\\"
+}
+
 // renderKitty transmits img as PNG via the Kitty graphics protocol (image id 1)
-// and returns a cols x rows grid of Unicode placeholder cells the terminal
-// fills in. The transmission escapes are zero-width and precede the first row.
-// When tmux is true each chunk is wrapped in a DCS passthrough.
-func renderKitty(img image.Image, cols, rows int, tmux bool) string {
-	if cols > len(diacritics) || rows > len(diacritics) {
+// and returns a cols x rows grid the terminal fills in: Unicode placeholder
+// cells, or with direct set, a placement anchored at the cursor followed by
+// blank cells. The escapes are zero-width and precede the first row. When
+// tmux is true each chunk is wrapped in a DCS passthrough.
+func renderKitty(img image.Image, cols, rows int, tmux, direct bool) string {
+	if !direct && (cols > len(diacritics) || rows > len(diacritics)) {
 		return renderBlocks(img, cols, rows)
 	}
 	// png.Encode emits 16-bit truecolor for non-RGBA sources such as a decoded
@@ -52,6 +82,10 @@ func renderKitty(img image.Image, cols, rows int, tmux bool) string {
 	}
 	data := base64.StdEncoding.EncodeToString(buf.Bytes())
 	var sb strings.Builder
+	place := "U=1"
+	if direct {
+		place = "C=1"
+	}
 	for i := 0; i < len(data); i += 4096 {
 		end := min(i+4096, len(data))
 		ctrl := "m=1"
@@ -59,13 +93,19 @@ func renderKitty(img image.Image, cols, rows int, tmux bool) string {
 			ctrl = "m=0"
 		}
 		if i == 0 {
-			ctrl = fmt.Sprintf("a=T,U=1,q=2,f=100,t=d,i=1,c=%d,r=%d,%s", cols, rows, ctrl)
+			ctrl = fmt.Sprintf("a=T,%s,q=2,f=100,t=d,i=1,c=%d,r=%d,%s", place, cols, rows, ctrl)
 		}
-		chunk := "\x1b_G" + ctrl + ";" + data[i:end] + "\x1b\\"
-		if tmux {
-			chunk = "\x1bPtmux;" + strings.ReplaceAll(chunk, "\x1b", "\x1b\x1b") + "\x1b\\"
+		sb.WriteString(passthrough("\x1b_G"+ctrl+";"+data[i:end]+"\x1b\\", tmux))
+	}
+	if direct {
+		blank := strings.Repeat(" ", cols)
+		for r := range rows {
+			if r > 0 {
+				sb.WriteByte('\n')
+			}
+			sb.WriteString(blank)
 		}
-		sb.WriteString(chunk)
+		return sb.String()
 	}
 	for r := range rows {
 		if r > 0 {
