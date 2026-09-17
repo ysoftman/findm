@@ -388,6 +388,30 @@ func (p *Player) Seek(seconds float64) error {
 	return err
 }
 
+// Replay restarts the current track from the beginning, resuming if paused.
+func (p *Player) Replay() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.state == Stopped {
+		return fmt.Errorf("nothing is playing")
+	}
+	if p.state == Preparing {
+		return ErrNotReady
+	}
+
+	if _, err := p.sendCommand("seek", 0, "absolute"); err != nil {
+		return err
+	}
+	if p.state == Paused {
+		if _, err := p.sendCommand("set_property", "pause", false); err != nil {
+			return err
+		}
+		p.state = Playing
+	}
+	return nil
+}
+
 // SetVolume sets the playback volume (0-100).
 func (p *Player) SetVolume(vol int) error {
 	p.mu.Lock()
