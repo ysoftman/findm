@@ -46,8 +46,13 @@ func renderPlayerBar(p *player.Player, width, frame int) string {
 	}
 	style := playerBarStyle.Width(width)
 
+	repeat := ""
+	if p.IsRepeat() {
+		repeat = "  ⟲"
+	}
+
 	if p.GetState() == player.Stopped {
-		return style.Render("  No track playing  |  /: search  q: quit")
+		return style.Render("  No track playing" + repeat + "  |  /: search  q: quit")
 	}
 
 	title := p.CurrentTitle()
@@ -56,7 +61,7 @@ func renderPlayerBar(p *player.Player, width, frame int) string {
 	vol := p.GetVolume()
 
 	// Truncate title based on available display columns (wide-char aware).
-	maxTitle := max(width-50, 15)
+	maxTitle := max(width-50-runewidth.StringWidth(repeat), 15)
 	title = runewidth.Truncate(title, maxTitle, "...")
 
 	status := animatedStateString(p.GetState(), frame)
@@ -64,7 +69,7 @@ func renderPlayerBar(p *player.Player, width, frame int) string {
 	posStr := formatSeconds(pos)
 	durStr := formatSeconds(dur)
 
-	line := fmt.Sprintf("  %s  %s  %s %s/%s  Vol:%d%%", status, title, progressBar, posStr, durStr, vol)
+	line := fmt.Sprintf("  %s%s  %s  %s %s/%s  Vol:%d%%", status, repeat, title, progressBar, posStr, durStr, vol)
 	return style.Render(line)
 }
 

@@ -572,9 +572,10 @@ func (m Model) handleResultsView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		vol := m.player.GetVolume() - 10
 		m.handlePlayerErr(m.player.SetVolume(vol))
 	case "r":
-		m.handlePlayerErr(m.player.Replay())
-		if m.player.GetState() == player.Playing {
-			m.viz.Start()
+		if m.player.ToggleRepeat() {
+			m.statusMsg = "Repeat on"
+		} else {
+			m.statusMsg = "Repeat off"
 		}
 	case "R":
 		if len(m.results) > 0 && m.cursor < len(m.results) {
@@ -706,9 +707,10 @@ func (m Model) handlePlaylistDetailView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.playingTrackIdx = -1
 		m.statusMsg = "Playback stopped"
 	case "r":
-		m.handlePlayerErr(m.player.Replay())
-		if m.player.GetState() == player.Playing {
-			m.viz.Start()
+		if m.player.ToggleRepeat() {
+			m.statusMsg = "Repeat on"
+		} else {
+			m.statusMsg = "Repeat off"
 		}
 	case "left":
 		m.handlePlayerErr(m.player.Seek(-10))
@@ -1016,11 +1018,11 @@ func helpText(view View) string {
 	case SearchView:
 		return "Enter: search (text, @handle, publisher, or URL)  Tab: next tab  Ctrl+C: quit"
 	case ResultsView:
-		return "j/k: move  Enter: play / open  n/p: next/prev  Space: pause  s: stop  h/l: seek  +/-: vol  r: replay  R: recommend  a: add  Tab: next tab  /: search  q: quit"
+		return "j/k: move  Enter: play / open  n/p: next/prev  Space: pause  s: stop  h/l: seek  +/-: vol  r: repeat  R: recommend  a: add  Tab: next tab  /: search  q: quit"
 	case PlaylistListView:
 		return "j/k: move  Enter: open  c: create  d: delete  Tab: next tab  Esc: back  q: quit"
 	case PlaylistDetailView:
-		return "j/k: move  Enter: play  n/p: next/prev  Space: pause  s: stop  ←→: seek  +/-: vol  r: replay  d: remove  Tab: next tab  Esc: back  q: quit"
+		return "j/k: move  Enter: play  n/p: next/prev  Space: pause  s: stop  ←→: seek  +/-: vol  r: repeat  d: remove  Tab: next tab  Esc: back  q: quit"
 	default:
 		return ""
 	}

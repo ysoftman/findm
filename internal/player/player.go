@@ -38,6 +38,7 @@ type Player struct {
 	reader     *bufio.Reader
 	lastErr    string // last fatal error from mpv (consumed once)
 	props      map[string]cachedProp
+	repeat     bool // loop the current track; survives across Play calls
 }
 
 type cachedProp struct {
@@ -84,13 +85,16 @@ func (p *Player) Play(url, title string) error {
 	_ = os.Remove(p.socketPath)
 
 	logBuf := &bytes.Buffer{}
-	p.cmd = exec.Command("mpv",
+	args := []string{
 		"--no-video",
 		"--quiet",
 		"--msg-level=all=error",
-		"--input-ipc-server="+p.socketPath,
-		url,
-	)
+		"--input-ipc-server=" + p.socketPath,
+	}
+	if p.repeat {
+		args = append(args, "--loop-file=inf")
+	}
+	p.cmd = exec.Command("mpv", append(args, url)...)
 	// mpv writes its error messages to stdout; capture both streams.
 	p.cmd.Stdout = logBuf
 	p.cmd.Stderr = logBuf
@@ -185,6 +189,10 @@ func (p *Player) connectIPC() {
 		}
 		p.conn = conn
 		p.reader = bufio.NewReader(conn)
+		if p.repeat {
+			// Repeat toggled on after spawn but before the socket came up.
+			_, _ = p.sendCommand("set_property", "loop-file", "inf")
+		}
 		p.mu.Unlock()
 
 		// Phase 2: wait until mpv has loaded the media
@@ -388,28 +396,28 @@ func (p *Player) Seek(seconds float64) error {
 	return err
 }
 
-// Replay restarts the current track from the beginning, resuming if paused.
-func (p *Player) Replay() error {
+// ToggleRepeat flips single-track looping and reports the new setting.
+// It applies to the running mpv immediately; Play passes it to new ones.
+func (p *Player) ToggleRepeat() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.state == Stopped {
-		return fmt.Errorf("nothing is playing")
-	}
-	if p.state == Preparing {
-		return ErrNotReady
-	}
-
-	if _, err := p.sendCommand("seek", 0, "absolute"); err != nil {
-		return err
-	}
-	if p.state == Paused {
-		if _, err := p.sendCommand("set_property", "pause", false); err != nil {
-			return err
+	p.repeat = !p.repeat
+	if p.conn != nil {
+		val := "no"
+		if p.repeat {
+			val = "inf"
 		}
-		p.state = Playing
+		_, _ = p.sendCommand("set_property", "loop-file", val)
 	}
-	return nil
+	return p.repeat
+}
+
+// IsRepeat reports whether single-track looping is on.
+func (p *Player) IsRepeat() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.repeat
 }
 
 // SetVolume sets the playback volume (0-100).
